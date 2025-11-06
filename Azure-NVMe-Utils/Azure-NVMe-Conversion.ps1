@@ -276,7 +276,7 @@ try {
     }
 }
 catch {
-    WriteRunLog -message "ADE extension is NOT installed on this VM"
+    WriteRunLog -message "ADE extension is NOT installed on this VM $($extension.VMName)" with status $($extension.ProvisioningState)" "
 }
 
 
