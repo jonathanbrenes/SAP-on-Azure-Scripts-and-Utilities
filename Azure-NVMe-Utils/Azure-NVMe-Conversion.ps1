@@ -276,7 +276,7 @@ try {
     }
 }
 catch {
-    Write-Host "ADE extension is NOT installed on this VM."
+    WriteRunLog -message "ADE extension is NOT installed on this VM"
 }
 
 
