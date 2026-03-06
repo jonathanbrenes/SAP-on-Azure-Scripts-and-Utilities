@@ -1,5 +1,8 @@
 # Changelog
 
+# Version 2026030601
+* FIX: operator precedence bug in NFS address IP check.
+
 # Version 2025110401
 * UPDATE: minimum module versions to fix a Posh-SSH issue
 * UPDATE: Check function for module version
