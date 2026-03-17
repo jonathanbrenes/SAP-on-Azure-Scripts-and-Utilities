@@ -68,6 +68,7 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Azure/SAP-on-Azure-Scr
 | `-StartVM`                     | Start the VM after conversion                                                | No       |
 | `-IgnoreSKUCheck`              | Ignore the check of the VM SKU                                               | No       |
 | `-IgnoreWindowsVersionCheck`   | Ignore the Windows Version check                                             | No       |
+| `-DryRun`                      | Assess Linux OS readiness without modifying files or converting the VM       | No       |
 | `-FixOperatingSystemSettings`  | Automatically fix the OS settings using Azure RunCommands                    | No       |
 | `-WriteLogfile`                | Create a Log File                                                            | No       |
 | `-IgnoreAzureModuleCheck`      | Do not run the check for installed Azure modules                             | No       |

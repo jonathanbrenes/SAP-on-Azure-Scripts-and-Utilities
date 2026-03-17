@@ -1,0 +1,2574 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SCSI-to-NVMe Multi-Image Test Lab Builder</title>
+  <style>
+    :root { --bg:#ffffff; --card:#ffffff; --border:#edebe9; --text:#201f1e; --muted:#605e5c; --primary:#0078d4; --primaryHover:#106ebe; --danger:#b91c1c; --headerBg:#0078d4; --headerText:#ffffff; --mono:'Cascadia Code',ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; --sans:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:var(--sans); color:var(--text); background:var(--bg); font-size:14px; -webkit-font-smoothing:antialiased; scrollbar-gutter:stable; }
+    header { background:var(--headerBg); color:var(--headerText); padding:12px 16px; font-weight:800; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:inset 0 -1px 0 rgba(255,255,255,0.18); position:sticky; top:0; z-index:100; }
+    .container { padding:16px; max-width:1440px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
+    @media (min-width:1100px) { .grid { grid-template-columns:1fr 1fr; } }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); min-height:300px; min-width:0; overflow:clip; }
+    .title { font-size:16px; font-weight:700; color:var(--text); }
+    label { font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px; }
+    input, textarea, select { width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:14px; font-family:var(--sans); background:#fff; color:var(--text); outline:none; transition:border-color 0.1s; }
+    input:focus, textarea:focus, select:focus { border-color:var(--primary); }
+    textarea { font-family:var(--mono); font-size:12px; line-height:1.4; resize:vertical; }
+    button { border:1px solid var(--border); background:#fff; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:400; font-size:13px; font-family:var(--sans); color:var(--text); transition:background 0.1s, border-color 0.1s; }
+    button:hover { background:#f3f2f1; }
+    button.primary { background:var(--primary); color:#fff; border-color:var(--primary); }
+    button.primary:hover { background:var(--primaryHover); border-color:var(--primaryHover); }
+    button.danger { background:#fff; border-color:#d13438; color:var(--danger); }
+    button.danger:hover { background:#fdf3f4; }
+    button:disabled { opacity:0.4; cursor:not-allowed; }
+    .muted { color:var(--muted); font-size:13px; margin-top:6px; }
+    .error-text { color:var(--danger); font-size:12px; margin-top:4px; font-weight:600; }
+    .section { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+    .btn-group { display:flex; gap:0; }
+    .btn-group button { border-radius:0; margin:0; border-right-width:0; }
+    .btn-group button:first-child { border-radius:8px 0 0 8px; }
+    .btn-group button:last-child { border-radius:0 8px 8px 0; border-right-width:1px; }
+    .btn-group button:only-child { border-radius:8px; border-right-width:1px; }
+    table.summary { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; table-layout:fixed; }
+    table.summary th, table.summary td { border:1px solid var(--border); padding:6px 8px; text-align:left; vertical-align:top; }
+    table.summary th { background:#faf9f8; font-weight:600; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:0.02em; }
+    .truncate-cell { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pill { display:inline-block; font-size:11px; font-weight:900; padding:2px 6px; border-radius:999px; border:1px solid var(--border); }
+    .ok { border-color:#b7e3c4; background:#ecfdf3; color:#16a34a; }
+    .textarea-wrap { position:relative; }
+    .textarea-wrap textarea { width:100%; }
+    .textarea-expand-btn { position:absolute; top:8px; right:24px; z-index:2; padding:4px 6px; font-size:14px; line-height:1; border:1px solid var(--border); border-radius:8px; background:#fff; cursor:pointer; opacity:0.6; }
+    .textarea-expand-btn:hover { opacity:1; background:#f3f2f1; }
+    .text-flow-window { display:none; position:fixed; inset:12px; border:1px solid var(--border); border-radius:12px; background:#fff; box-shadow:0 20px 40px rgba(0,0,0,0.22); z-index:110; padding:16px; flex-direction:column; }
+    .text-flow-window.show { display:flex; }
+    .text-flow-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+    .text-flow-header .btn-group { display:flex; gap:0; }
+    .text-flow-body { flex:1; min-height:0; position:relative; }
+    .text-flow-body textarea { width:100%; height:100%; resize:none; }
+    .image-picker-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:200; }
+    .image-picker-overlay.show { display:block; }
+    .image-picker-panel { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:min(600px, 92vw); max-height:80vh; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:0 16px 40px rgba(0,0,0,0.22); z-index:201; display:flex; flex-direction:column; }
+    .image-picker-header { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .image-picker-header .title { margin:0; }
+    .image-picker-body { padding:8px 16px; overflow-y:auto; flex:1; }
+    .image-picker-body label { display:flex; align-items:center; gap:8px; padding:8px 0; font-size:13px; font-weight:400; cursor:pointer; border-bottom:1px solid #f3f2f1; }
+    .image-picker-body label:last-child { border-bottom:none; }
+    .image-picker-body label:hover { background:#faf9f8; }
+    .image-picker-body input[type="checkbox"] { width:16px; height:16px; margin:0; flex-shrink:0; accent-color:var(--primary); }
+    .image-picker-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
+    .help-wrap { position: relative; }
+    .help-balloon {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: min(520px, 90vw);
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      padding: 12px;
+      z-index: 30;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.45;
+      display: none;
+      white-space: normal;
+    }
+    .help-balloon.show { display: block; }
+    .help-balloon { font-weight: 400; }
+    .help-balloon h4 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+    .help-balloon ul { margin: 0 0 0 16px; padding: 0; }
+    .help-balloon li { margin: 4px 0; }
+    #helpBtn { border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.14); color: #fff; font-size: 10px; padding: 3px 6px; }
+    #helpBtn:hover { background: rgba(255,255,255,0.22); }
+  </style>
+</head>
+<body>
+<header>
+  <div>SCSI-to-NVMe Multi-Image Test Lab Builder</div>
+  <div class="help-wrap">
+    <button id="helpBtn" type="button">Help</button>
+    <div id="helpBalloon" class="help-balloon" role="dialog" aria-label="Help" aria-hidden="true">
+      <h4>About SCSI-to-NVMe Multi-Image Test Lab Builder</h4>
+      <ul>
+        <li><strong>Purpose:</strong> Generates an ARM template that deploys one control VM plus one VM per image in the catalog (112 images across RedHat, Debian, Canonical, SUSE, AlmaLinux, and Azure Linux), for automated SCSI-to-NVMe conversion testing.</li>
+        <li><strong>Control VM:</strong> A RHEL 9 Gen2 Standard_B2s VM with Ansible, httpd, and a key server. After deployment, it automatically polls all image VMs with ping (30 forks) and runs the test playbook once all VMs are online. A live status page is served on port 80.</li>
+        <li><strong>Image filters:</strong> Narrow the catalog by architecture (x64/Arm64), generation (Gen1/Gen2), disk controller (All/NVMe capable/SCSI only), or publisher. The smallest compatible VM size is auto-selected per image.</li>
+        <li><strong>Disk controller &ldquo;All&rdquo; mode:</strong> Deploys both SCSI and NVMe variants for NVMe-capable images, producing up to 175 VMs (112 SCSI + 63 NVMe) at full catalog.</li>
+        <li><strong>Force VM size:</strong> Override automatic size selection to use a specific VM size for all compatible images. The dropdown auto-filters to sizes compatible with the current image set.</li>
+        <li><strong>Force images:</strong> Pick specific images from the catalog instead of deploying all filtered images.</li>
+        <li><strong>Quota guard &amp; multi-region:</strong> Set a regional vCPU limit (default 100). When projected usage exceeds the limit, VMs are automatically split across multiple regions. Multi-region deployments use a subscription-scope ARM template with per-region resource groups and hub-spoke VNet peering so the control VM can reach all image VMs via private IPs.</li>
+        <li><strong>Test playbook:</strong> Paste an Ansible YAML playbook. It is gzip-compressed and base64-encoded into cloud-init custom data, then auto-executed by the control VM after all image VMs respond to ping.</li>
+        <li><strong>Output:</strong> Single-region: resource-group-scope ARM template. Multi-region: subscription-scope template (deploy at subscription level, not resource group). Includes VNet/subnet/NSG, control VM with public IP, and one VM per selected image with SSH key auth. Use Copy, Copy + Portal, or Download.</li>
+        <li><strong>Results:</strong> The control VM runs httpd on port 80. After the playbook completes, results are served at /results.json and an HTML validation report at /index.html, accessible via the control VM&rsquo;s public FQDN.</li>
+      </ul>
+    </div>
+  </div>
+</header>
+<div class="container">
+  <div class="grid">
+    <div class="card">
+      <div class="title">Configuration</div>
+      <div style="margin-top:12px;">
+        <label for="sshKey">SSH Public Key (for azureuser on all VMs)</label>
+        <input id="sshKey" type="text" placeholder="ssh-rsa AAAAB3NzaC1..." />
+        <div id="sshKeyError" class="error-text"></div>
+      </div>
+      <div style="margin-top:12px;">
+        <label for="testYaml">Test Playbook YAML (saved to /home/ansible/test.yml on control VM)</label>
+        <div class="textarea-wrap">
+          <button id="expandYamlBtn" class="textarea-expand-btn" title="Maximize YAML" type="button">&#x26F6;</button>
+          <textarea id="testYaml" style="min-height:200px;" placeholder="---
+"></textarea>
+        </div>
+      </div>
+      <div class="section">
+        <div class="title">Image Filters</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; margin-top:8px;">
+          <div>
+            <label for="filterArch">Architecture</label>
+            <select id="filterArch" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+              <option value="">All</option>
+              <option value="x64">x64</option>
+              <option value="Arm64">Arm64</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterGen">Generation</label>
+            <select id="filterGen" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+              <option value="">All</option>
+              <option value="Gen1">Gen1</option>
+              <option value="Gen2">Gen2</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterController">Disk Controller</label>
+            <select id="filterController" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+              <option value="">All</option>
+              <option value="nvme">NVMe capable</option>
+              <option value="scsi-only">SCSI only</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterPublisher">Publisher</label>
+            <select id="filterPublisher" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+              <option value="">All</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:flex-end; justify-content:flex-end; grid-column: -2 / -1;">
+            <button id="clearFiltersBtn" type="button" style="font-size:12px; padding:8px 10px;">Clear filters</button>
+          </div>
+        </div>
+        <div class="muted">Filter the image catalog. The smallest compatible VM size is auto-selected per image.</div>
+        <div id="genFilterError" class="error-text"></div>
+      </div>
+      <div class="section">
+        <div class="title">Force VM Size &amp; Images</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+          <div>
+            <label for="forcedVmSize">Force VM size</label>
+            <select id="forcedVmSize" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); font-size:13px;">
+              <option value="">Auto (smallest compatible)</option>
+            </select>
+            <div class="muted">When set, all compatible images use this size.</div>
+          </div>
+          <div>
+            <label>Force images</label>
+            <button id="openImagePickerBtn" type="button" style="width:100%; text-align:left; padding:8px 10px; font-size:13px; font-weight:400; color:var(--muted);">
+              All filtered
+            </button>
+            <div class="muted">Pick specific distros. VM sizes auto-filter to match.</div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="title">Quota Guard</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; margin-top:8px;">
+          <div>
+            <label for="regionalVcpuLimit">Regional vCPU limit</label>
+            <input id="regionalVcpuLimit" type="number" min="1" step="1" placeholder="100" style="padding:8px; border-radius:8px; border:1px solid var(--border); font-size:13px;" />
+            <div class="muted">Default 100. Single region is used when projected usage fits within limit.</div>
+          </div>
+        </div>
+        <div id="quotaStatus" class="muted" style="margin-top:8px;">Projected usage will appear here.</div>
+        <div id="quotaAlert" class="error-text"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div class="title">Generated ARM JSON</div>
+        <div class="btn-group">
+          <button id="copyBtn" disabled>Copy</button>
+          <button id="deployPortalBtn" disabled>Copy + Portal</button>
+          <button id="downloadBtn" class="primary" disabled>Download</button>
+        </div>
+        <button id="resetStateBtn" class="danger" title="Clear all saved state and reload" style="margin-left:auto;">Reset</button>
+      </div>
+      <div class="section" style="margin-top:8px; padding-top:8px;">
+        <div class="muted" id="regionTabMeta"></div>
+      </div>
+      <div class="muted" style="margin-top:8px;">Generates one VNet/subnet/NSG + control VM + one VM per image in the catalog. All VMs use SSH key authentication.</div>
+      <div id="splitWarning" class="error-text"></div>
+      <div class="textarea-wrap">
+        <button id="expandJsonBtn" class="textarea-expand-btn" title="Maximize JSON" type="button">&#x26F6;</button>
+        <textarea id="output" readonly spellcheck="false" style="margin-top:10px; min-height:250px;"></textarea>
+      </div>
+
+      <div class="section" style="margin-top:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <div class="title">VM Summary</div>
+          <button id="expandSummaryBtn" type="button" style="font-size:14px; padding:4px 6px; line-height:1;" title="Maximize VM Summary">&#x26F6;</button>
+        </div>
+        <div class="muted">Control VM: <strong>1 per region</strong> (RHEL 9 Gen2, Standard_B2s) &#x2014; Test YAML at /home/ansible/test.yml</div>
+        <div class="muted" id="vmCount">Image VMs: 45 (x64: Standard_B2s, Arm64: Standard_D2ps_v6)</div>
+        <div id="vmTable" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="imagePickerOverlay" class="image-picker-overlay">
+  <div class="image-picker-panel">
+    <div class="image-picker-header">
+      <div class="title">Select images for forced size</div>
+      <span id="imagePickerCount" class="muted" style="margin:0;"></span>
+    </div>
+    <div class="image-picker-body" id="imagePickerBody"></div>
+    <div class="image-picker-footer">
+      <button id="imagePickerSelectAll" type="button" style="font-size:12px;">Select all</button>
+      <button id="imagePickerClearAll" type="button" style="font-size:12px;">Clear</button>
+      <button id="imagePickerDone" type="button" class="primary" style="font-size:12px;">Done</button>
+    </div>
+  </div>
+</div>
+
+<div id="yamlFlowWindow" class="text-flow-window">
+  <div class="text-flow-header">
+    <div class="title">Test Playbook YAML</div>
+    <div class="btn-group">
+      <button id="yamlFlowCopyBtn" type="button">Copy</button>
+      <button id="yamlFlowCloseBtn" type="button" class="danger">Close</button>
+    </div>
+  </div>
+  <div class="text-flow-body">
+    <textarea id="yamlFlowOutput" spellcheck="false"></textarea>
+  </div>
+</div>
+
+<div id="jsonFlowWindow" class="text-flow-window">
+  <div class="text-flow-header">
+    <div class="title">Generated ARM JSON</div>
+    <div class="btn-group">
+      <button id="jsonFlowCopyBtn" type="button">Copy</button>
+      <button id="jsonFlowCloseBtn" type="button" class="danger">Close</button>
+    </div>
+  </div>
+  <div class="text-flow-body">
+    <textarea id="jsonFlowOutput" readonly spellcheck="false"></textarea>
+  </div>
+</div>
+
+<div id="summaryFlowWindow" class="text-flow-window">
+  <div class="text-flow-header">
+    <div class="title">VM Summary</div>
+    <button id="summaryFlowCloseBtn" type="button" class="danger" style="font-size:14px; padding:4px 8px;" title="Minimize">&#x25A1;</button>
+  </div>
+  <div style="flex:1; overflow-y:auto; padding:4px;">
+    <div class="muted" id="summaryFlowCount"></div>
+    <div id="summaryFlowTable" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---------------------------------------------------------------------------
+// Image catalog (same format as arm builder.html)
+// ---------------------------------------------------------------------------
+const imageOptions = [
+  // RedHat
+  { key: 'rhel_10_1_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL 10.1 (Gen1) (RedHat:RHEL:10_1:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'10_1', version:'latest' } },
+  { key: 'rhel_10_lvm_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL 10 (Gen2) (RedHat:RHEL:10-lvm-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'10-lvm-gen2', version:'latest' } },
+  { key: 'rhel_7_6_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL:7.6 (Gen1) (RedHat:RHEL:7.6:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'7.6', version:'latest' } },
+  { key: 'rhel_7_8_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL:7.8 (Gen1) (RedHat:RHEL:7.8:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'7.8', version:'latest' } },
+  { key: 'rhel_8_9_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL 8.9 (Gen1) (RedHat:RHEL:8_9:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'8_9', version:'latest' } },
+  { key: 'rhel_8_lvm_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL 8 (Gen2) (RedHat:RHEL:8-lvm-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'8-lvm-gen2', version:'latest' } },
+  { key: 'rhel_9_7_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL 9.7 (Gen1) (RedHat:RHEL:9_7:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'9_7', version:'latest' } },
+  { key: 'rhel_9_lvm_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL 9 (Gen2) (RedHat:RHEL:9-lvm-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'9-lvm-gen2', version:'latest' } },
+  { key: 'rhel_arm64_10_1_arm64_arm64_gen2', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL 10.1 Arm64 (Gen2) (RedHat:rhel-arm64:10_1-arm64:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-arm64', sku:'10_1-arm64', version:'latest' } },
+  { key: 'rhel_arm64_8_10_arm64_arm64_gen2', arch: 'Arm64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL 8.10 Arm64 (Gen2) (RedHat:rhel-arm64:8_10-arm64:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-arm64', sku:'8_10-arm64', version:'latest' } },
+  { key: 'rhel_arm64_9_7_arm64_arm64_gen2', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL 9.7 Arm64 (Gen2) (RedHat:rhel-arm64:9_7-arm64:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-arm64', sku:'9_7-arm64', version:'latest' } },
+  { key: 'rhel_raw_10_1_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 10.1 (Gen1) (RedHat:rhel-raw:10_1:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'10_1', version:'latest' } },
+  { key: 'rhel_raw_10_raw_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL Raw 10 (Gen2) (RedHat:rhel-raw:10-raw-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'10-raw-gen2', version:'latest' } },
+  { key: 'rhel_raw_10_raw_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 10 (Gen1) (RedHat:rhel-raw:10-raw:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'10-raw', version:'latest' } },
+  { key: 'rhel_raw_89_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 8.9 (Gen2) (RedHat:rhel-raw:89-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'89-gen2', version:'latest' } },
+  { key: 'rhel_raw_8_4_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 8.4 (Gen1) (RedHat:rhel-raw:8_4:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'8_4', version:'latest' } },
+  { key: 'rhel_raw_8_9_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 8.9 (Gen1) (RedHat:rhel-raw:8_9:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'8_9', version:'latest' } },
+  { key: 'rhel_raw_8_raw_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 8 (Gen2) (RedHat:rhel-raw:8-raw-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'8-raw-gen2', version:'latest' } },
+  { key: 'rhel_raw_8_raw_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 8 (Gen1) (RedHat:rhel-raw:8-raw:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'8-raw', version:'latest' } },
+  { key: 'rhel_raw_9_5_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Raw 9.5 (Gen1) (RedHat:rhel-raw:9_5:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'9_5', version:'latest' } },
+  { key: 'rhel_ha_8_8_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL HA x86_64 (Gen1) (RedHat:RHEL-HA:8_8:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-HA', sku:'8_8', version:'latest' } },
+  { key: 'rhel_raw_9_raw_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL Raw 9 (Gen2) (RedHat:rhel-raw:9-raw-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'9-raw-gen2', version:'latest' } },
+  { key: 'rhel_raw_9_raw_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL Raw 9 (Gen1) (RedHat:rhel-raw:9-raw:latest)',
+    ref: { publisher:'RedHat', offer:'rhel-raw', sku:'9-raw', version:'latest' } },
+  { key: 'rhel_sap_ha_84sapha_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL SAP HA 8.4 (Gen2) (RedHat:RHEL-SAP-HA:84sapha-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-HA', sku:'84sapha-gen2', version:'latest' } },
+  { key: 'rhel_sap_ha_96sapha_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL SAP HA 9.6 (Gen2) (RedHat:RHEL-SAP-HA:96sapha-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-HA', sku:'96sapha-gen2', version:'latest' } },
+  // Debian
+  { key: 'debian_11_11_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Debian 11 x86_64 (Gen1) (Debian:debian-11:11:latest)',
+    ref: { publisher:'Debian', offer:'debian-11', sku:'11', version:'latest' } },
+  { key: 'debian_12_12_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Debian 12 x86_64 (Gen1) (Debian:debian-12:12:latest)',
+    ref: { publisher:'Debian', offer:'debian-12', sku:'12', version:'latest' } },
+  { key: 'debian_13_13_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Debian 13 x86_64 (Gen1) (Debian:debian-13:13:latest)',
+    ref: { publisher:'Debian', offer:'debian-13', sku:'13', version:'latest' } },
+  { key: 'debian_11_11_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Debian 11 x86_64 (Gen2) (Debian:debian-11:11-gen2:latest)',
+    ref: { publisher:'Debian', offer:'debian-11', sku:'11-gen2', version:'latest' } },
+  { key: 'debian_12_12_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Debian 12 x86_64 (Gen2) (Debian:debian-12:12-gen2:latest)',
+    ref: { publisher:'Debian', offer:'debian-12', sku:'12-gen2', version:'latest' } },
+  { key: 'debian_13_13_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Debian 13 x86_64 (Gen2) (Debian:debian-13:13-gen2:latest)',
+    ref: { publisher:'Debian', offer:'debian-13', sku:'13-gen2', version:'latest' } },
+  { key: 'debian_12_12_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Debian 12 Arm64 (Gen2) (Debian:debian-12:12-arm64:latest)',
+    ref: { publisher:'Debian', offer:'debian-12', sku:'12-arm64', version:'latest' } },
+  { key: 'debian_13_13_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Debian 13 Arm64 (Gen2) (Debian:debian-13:13-arm64:latest)',
+    ref: { publisher:'Debian', offer:'debian-13', sku:'13-arm64', version:'latest' } },
+  // Canonical
+  { key: 'ubuntu_24_04_lts_server_arm64_arm64_gen2', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24.04 Arm64 (Gen2) (Canonical:ubuntu-24_04-lts:server-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'server-arm64', version:'latest' } },
+  { key: 'ubuntu_24_04_lts_server_gen1_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 24.04 (Gen1) (Canonical:ubuntu-24_04-lts:server-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'server-gen1', version:'latest' } },
+  { key: 'ubuntu_24_04_lts_server_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24.04 (Gen2) (Canonical:ubuntu-24_04-lts:server:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'server', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_minimal_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS x86_64 (Gen2) (Canonical:ubuntu-24_04-lts:minimal:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'minimal', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_minimal_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS x86_64 (Gen1) (Canonical:ubuntu-24_04-lts:minimal-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'minimal-gen1', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_minimal_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS Arm64 (Gen2) (Canonical:ubuntu-24_04-lts:minimal-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'minimal-arm64', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_ubuntu_pro_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS x86_64 (Gen2) (Canonical:ubuntu-24_04-lts:ubuntu-pro:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'ubuntu-pro', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_ubuntu_pro_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS x86_64 (Gen1) (Canonical:ubuntu-24_04-lts:ubuntu-pro-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'ubuntu-pro-gen1', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_ubuntu_pro_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS Arm64 (Gen2) (Canonical:ubuntu-24_04-lts:ubuntu-pro-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'ubuntu-pro-arm64', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_ubuntu_pro_minimal_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS x86_64 (Gen2) (Canonical:ubuntu-24_04-lts:ubuntu-pro-minimal:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'ubuntu-pro-minimal', version:'latest' } },
+
+  { key: 'ubuntu_24_04_lts_ubuntu_pro_minimal_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 24 04 LTS Arm64 (Gen2) (Canonical:ubuntu-24_04-lts:ubuntu-pro-minimal-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-24_04-lts', sku:'ubuntu-pro-minimal-arm64', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_server_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen2) (Canonical:ubuntu-22_04-lts:server:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'server', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_server_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen1) (Canonical:ubuntu-22_04-lts:server-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'server-gen1', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_minimal_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen2) (Canonical:ubuntu-22_04-lts:ubuntu-minimal:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-minimal', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_minimal_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen1) (Canonical:ubuntu-22_04-lts:ubuntu-minimal-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-minimal-gen1', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen2) (Canonical:ubuntu-22_04-lts:ubuntu-pro:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro', version:'latest' } },
+
+  { key: '0001_com_ubuntu_server_jammy_22_04_lts_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: true, scsiCapable: true,
+    label: '0001 Com Ubuntu Server Jammy x86_64 (Gen1) (Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-server-jammy', sku:'22_04-lts', version:'latest' } },
+
+  { key: '0001_com_ubuntu_server_jammy_22_04_lts_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: '0001 Com Ubuntu Server Jammy x86_64 (Gen2) (Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-server-jammy', sku:'22_04-lts-gen2', version:'latest' } },
+
+  { key: '0001_com_ubuntu_minimal_jammy_minimal_22_04_lts_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: '0001 Com Ubuntu Minimal Jammy x86_64 (Gen1) (Canonical:0001-com-ubuntu-minimal-jammy:minimal-22_04-lts:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-minimal-jammy', sku:'minimal-22_04-lts', version:'latest' } },
+
+  { key: '0001_com_ubuntu_minimal_jammy_minimal_22_04_lts_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: '0001 Com Ubuntu Minimal Jammy x86_64 (Gen2) (Canonical:0001-com-ubuntu-minimal-jammy:minimal-22_04-lts-gen2:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-minimal-jammy', sku:'minimal-22_04-lts-gen2', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_minimal_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS Arm64 (Gen2) (Canonical:ubuntu-22_04-lts:ubuntu-pro-minimal-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro-minimal-arm64', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_fips_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS Arm64 (Gen2) (Canonical:ubuntu-22_04-lts:ubuntu-pro-fips-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro-fips-arm64', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS Arm64 (Gen2) (Canonical:ubuntu-22_04-lts:ubuntu-pro-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro-arm64', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_minimal_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen1) (Canonical:ubuntu-22_04-lts:ubuntu-pro-minimal-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro-minimal-gen1', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_minimal_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen2) (Canonical:ubuntu-22_04-lts:ubuntu-pro-minimal:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro-minimal', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen1) (Canonical:ubuntu-22_04-lts:ubuntu-pro-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro-gen1', version:'latest' } },
+
+  { key: 'ubuntu_22_04_lts_ubuntu_pro_fips_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 22 04 LTS x86_64 (Gen2) (Canonical:ubuntu-22_04-lts:ubuntu-pro-fips:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-22_04-lts', sku:'ubuntu-pro-fips', version:'latest' } },
+
+  { key: 'ubuntu_25_10_minimal_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 25 10 x86_64 (Gen2) (Canonical:ubuntu-25_10:minimal:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-25_10', sku:'minimal', version:'latest' } },
+
+  { key: 'ubuntu_25_10_minimal_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 25 10 x86_64 (Gen1) (Canonical:ubuntu-25_10:minimal-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-25_10', sku:'minimal-gen1', version:'latest' } },
+
+  { key: 'ubuntu_25_10_server_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 25 10 x86_64 (Gen2) (Canonical:ubuntu-25_10:server:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-25_10', sku:'server', version:'latest' } },
+
+  { key: 'ubuntu_25_10_server_gen1_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Ubuntu 25 10 x86_64 (Gen1) (Canonical:ubuntu-25_10:server-gen1:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-25_10', sku:'server-gen1', version:'latest' } },
+
+  { key: 'ubuntu_25_10_minimal_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 25 10 Arm64 (Gen2) (Canonical:ubuntu-25_10:minimal-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-25_10', sku:'minimal-arm64', version:'latest' } },
+
+  { key: 'ubuntu_25_10_server_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Ubuntu 25 10 Arm64 (Gen2) (Canonical:ubuntu-25_10:server-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'ubuntu-25_10', sku:'server-arm64', version:'latest' } },
+
+  { key: '0001_com_ubuntu_server_focal_20_04_lts_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: true, scsiCapable: true,
+    label: '0001 Com Ubuntu Server Focal x86_64 (Gen1) (Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-server-focal', sku:'20_04-lts', version:'latest' } },
+
+  { key: '0001_com_ubuntu_server_focal_20_04_lts_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: '0001 Com Ubuntu Server Focal x86_64 (Gen2) (Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-server-focal', sku:'20_04-lts-gen2', version:'latest' } },
+
+  { key: '0001_com_ubuntu_server_focal_20_04_lts_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: '0001 Com Ubuntu Server Focal Arm64 (Gen2) (Canonical:0001-com-ubuntu-server-focal:20_04-lts-arm64:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-server-focal', sku:'20_04-lts-arm64', version:'latest' } },
+
+  { key: '0001_com_ubuntu_minimal_focal_minimal_20_04_lts_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: '0001 Com Ubuntu Minimal Focal x86_64 (Gen1) (Canonical:0001-com-ubuntu-minimal-focal:minimal-20_04-lts:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-minimal-focal', sku:'minimal-20_04-lts', version:'latest' } },
+
+  { key: '0001_com_ubuntu_minimal_focal_minimal_20_04_lts_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: '0001 Com Ubuntu Minimal Focal x86_64 (Gen2) (Canonical:0001-com-ubuntu-minimal-focal:minimal-20_04-lts-gen2:latest)',
+    ref: { publisher:'Canonical', offer:'0001-com-ubuntu-minimal-focal', sku:'minimal-20_04-lts-gen2', version:'latest' } },
+
+  // SUSE
+  { key: 'sles_12_sp5_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'SLES 12 SP5 x86_64 (Gen2) (SUSE:sles-12-sp5:gen2:latest)',
+    ref: { publisher:'SUSE', offer:'sles-12-sp5', sku:'gen2', version:'latest' } },
+  { key: 'sles_15_sp6_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'SLES 15 SP6 x86_64(Gen2) (SUSE:sles-15-sp6:gen2:latest)',
+    ref: { publisher:'SUSE', offer:'sles-15-sp6', sku:'gen2', version:'latest' } },
+  { key: 'sles_15_sp7_gen1_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'SLES 15 SP7 x86_64 (Gen1) (SUSE:sles-15-sp7:gen1:latest)',
+    ref: { publisher:'SUSE', offer:'sles-15-sp7', sku:'gen1', version:'latest' } },
+  { key: 'sles_15_sp7_arm64_gen2_arm64_gen2', arch: 'Arm64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'SLES 15 SP7 Arm64 (Gen2) (SUSE:sles-15-sp7-arm64:gen2:latest)',
+    ref: { publisher:'SUSE', offer:'sles-15-sp7-arm64', sku:'gen2', version:'latest' } },
+  { key: 'sles-16-0-arm64-gen2-arm64-gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'SLES 16 0 Arm64 (Gen2) (SUSE:sles-16-0-arm64:gen2:latest)',
+    ref: { publisher:'SUSE', offer:'sles-16-0-arm64', sku:'gen2', version:'latest' } },
+  { key: 'sles_15_sp7_basic_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'SLES 15 SP7 basic x86_64 (Gen2) (SUSE:sles-15-sp7-basic:gen2:latest)',
+    ref: { publisher:'SUSE', offer:'sles-15-sp7-basic', sku:'gen2', version:'latest' } },
+  { key: 'sles_16_0_x86_64_gen1_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'SLES 16.0 x86_64 (Gen1) (SUSE:sles-16-0-x86-64:gen1:latest)',
+    ref: { publisher:'SUSE', offer:'sles-16-0-x86-64', sku:'gen1', version:'latest' } },
+  { key: 'sles_16_0_x86_64_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'SLES 16.0 x86_64 (Gen2) (SUSE:sles-16-0-x86-64:gen2:latest)',
+    ref: { publisher:'SUSE', offer:'sles-16-0-x86-64', sku:'gen2', version:'latest' } },
+  { key: 'sles_sap_15_sp7_gen1_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'SLES SAP 15 SP7 x86_64 (Gen1) (SUSE:sles-sap-15-sp7:gen1:latest)',
+    ref: { publisher:'SUSE', offer:'sles-sap-15-sp7', sku:'gen1', version:'latest' } },
+  { key: 'sles_sap_15_sp7_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'SLES SAP 15 SP7 x86_64 (Gen2) (SUSE:sles-sap-15-sp7:gen2:latest)',
+    ref: { publisher:'SUSE', offer:'sles-sap-15-sp7', sku:'gen2', version:'latest' } },
+  // AlmaLinux
+  { key: 'almalinux-arm-10-arm64-64k-gen2-arm64-gen2-latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'AlmaLinux Arm 10 64k (Gen2) (almalinux:almalinux-arm:10-arm64-64k-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-arm', sku:'10-arm64-64k-gen2', version:'latest' } },
+  { key: 'almalinux-arm-10-arm64-gen2-arm64-gen2-latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'AlmaLinux Arm 10 (Gen2) (almalinux:almalinux-arm:10-arm64-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-arm', sku:'10-arm64-gen2', version:'latest' } },
+  { key: 'almalinux-arm-8-arm-gen2-arm64-gen2-latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'AlmaLinux Arm 8 (Gen2) (almalinux:almalinux-arm:8-arm-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-arm', sku:'8-arm-gen2', version:'latest' } },
+  { key: 'almalinux-arm-9-arm-64k-gen2-arm64-gen2-latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'AlmaLinux Arm 9 64k (Gen2) (almalinux:almalinux-arm:9-arm-64k-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-arm', sku:'9-arm-64k-gen2', version:'latest' } },
+  { key: 'almalinux-arm-9-arm-gen2-arm64-gen2-latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'AlmaLinux Arm 9 (Gen2) (almalinux:almalinux-arm:9-arm-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-arm', sku:'9-arm-gen2', version:'latest' } },
+  { key: 'almalinux-x86-64-10-gen1-x64-gen1-latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'AlmaLinux 10 (Gen1) (almalinux:almalinux-x86_64:10-gen1:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-x86_64', sku:'10-gen1', version:'latest' } },
+  { key: 'almalinux-x86-64-10-gen2-x64-gen2-latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'AlmaLinux 10 (Gen2) (almalinux:almalinux-x86_64:10-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-x86_64', sku:'10-gen2', version:'latest' } },
+  { key: 'almalinux-x86-64-8-gen1-x64-gen1-latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'AlmaLinux 8 (Gen1) (almalinux:almalinux-x86_64:8-gen1:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-x86_64', sku:'8-gen1', version:'latest' } },
+  { key: 'almalinux-x86-64-8-gen2-x64-gen2-latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'AlmaLinux 8 (Gen2) (almalinux:almalinux-x86_64:8-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-x86_64', sku:'8-gen2', version:'latest' } },
+  { key: 'almalinux-x86-64-9-gen1-x64-gen1-latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'AlmaLinux 9 (Gen1) (almalinux:almalinux-x86_64:9-gen1:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-x86_64', sku:'9-gen1', version:'latest' } },
+  { key: 'almalinux-x86-64-9-gen2-x64-gen2-latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'AlmaLinux 9 (Gen2) (almalinux:almalinux-x86_64:9-gen2:latest)',
+    ref: { publisher:'almalinux', offer:'almalinux-x86_64', sku:'9-gen2', version:'latest' } },
+
+  // Azure Linux (MicrosoftCBLMariner)
+  { key: 'azure_linux_3_azure_linux_3_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Azure Linux 3 x86_64 (Gen1) (MicrosoftCBLMariner:azure-linux-3:azure-linux-3:latest)',
+    ref: { publisher:'MicrosoftCBLMariner', offer:'azure-linux-3', sku:'azure-linux-3', version:'latest' } },
+
+  { key: 'azure_linux_3_azure_linux_3_fips_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'Azure Linux 3 x86_64 (Gen1) (MicrosoftCBLMariner:azure-linux-3:azure-linux-3-fips:latest)',
+    ref: { publisher:'MicrosoftCBLMariner', offer:'azure-linux-3', sku:'azure-linux-3-fips', version:'latest' } },
+
+  { key: 'azure_linux_3_azure_linux_3_gen2_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Azure Linux 3 x86_64 (Gen2) (MicrosoftCBLMariner:azure-linux-3:azure-linux-3-gen2:latest)',
+    ref: { publisher:'MicrosoftCBLMariner', offer:'azure-linux-3', sku:'azure-linux-3-gen2', version:'latest' } },
+
+  { key: 'azure_linux_3_azure_linux_3_gen2_fips_x64_gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Azure Linux 3 x86_64 (Gen2) (MicrosoftCBLMariner:azure-linux-3:azure-linux-3-gen2-fips:latest)',
+    ref: { publisher:'MicrosoftCBLMariner', offer:'azure-linux-3', sku:'azure-linux-3-gen2-fips', version:'latest' } },
+
+  { key: 'azure_linux_3_azure_linux_3_arm64_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Azure Linux 3 Arm64 (Gen2) (MicrosoftCBLMariner:azure-linux-3:azure-linux-3-arm64:latest)',
+    ref: { publisher:'MicrosoftCBLMariner', offer:'azure-linux-3', sku:'azure-linux-3-arm64', version:'latest' } },
+
+  { key: 'azure_linux_3_azure_linux_3_arm64_gen2_fips_arm64_gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'Azure Linux 3 Arm64 (Gen2) (MicrosoftCBLMariner:azure-linux-3:azure-linux-3-arm64-gen2-fips:latest)',
+    ref: { publisher:'MicrosoftCBLMariner', offer:'azure-linux-3', sku:'azure-linux-3-arm64-gen2-fips', version:'latest' } },
+
+    // Oracle Linux
+    { key: 'oracle-linux-ol10-lvm-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen1) (Oracle:Oracle-Linux:ol10-lvm:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol10-lvm', version:'latest' } },
+
+    { key: 'oracle-linux-ol10-lvm-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen2) (Oracle:Oracle-Linux:ol10-lvm-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol10-lvm-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol79-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen2) (Oracle:Oracle-Linux:ol79-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol79-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol810-lvm-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen1) (Oracle:Oracle-Linux:ol810-lvm:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol810-lvm', version:'latest' } },
+
+    { key: 'oracle-linux-ol810-lvm-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen2) (Oracle:Oracle-Linux:ol810-lvm-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol810-lvm-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol82-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen2) (Oracle:Oracle-Linux:ol82-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol82-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol95-lvm-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen1) (Oracle:Oracle-Linux:ol95-lvm:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol95-lvm', version:'latest' } },
+
+    { key: 'oracle-linux-ol95-lvm-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen2) (Oracle:Oracle-Linux:ol95-lvm-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol95-lvm-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol96-lvm-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+      label: 'Oracle Linux x86_64 (Gen1) (Oracle:Oracle-Linux:ol96-lvm:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol96-lvm', version:'latest' } },
+
+    { key: 'oracle-linux-ol10-arm64-lvm-gen2-arm64-gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+      label: 'Oracle Linux Arm64 (Gen2) (Oracle:Oracle-Linux:ol10-arm64-lvm-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol10-arm64-lvm-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol810-arm64-lvm-gen2-arm64-gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+      label: 'Oracle Linux Arm64 (Gen2) (Oracle:Oracle-Linux:ol810-arm64-lvm-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol810-arm64-lvm-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol95-arm64-lvm-gen2-arm64-gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+      label: 'Oracle Linux Arm64 (Gen2) (Oracle:Oracle-Linux:ol95-arm64-lvm-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol95-arm64-lvm-gen2', version:'latest' } },
+
+    { key: 'oracle-linux-ol96-arm64-lvm-gen2-arm64-gen2_latest', arch: 'Arm64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+      label: 'Oracle Linux Arm64 (Gen2) (Oracle:Oracle-Linux:ol96-arm64-lvm-gen2:latest)',
+      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol96-arm64-lvm-gen2', version:'latest' } }    
+];
+
+// ---------------------------------------------------------------------------
+// VM Size catalog (same format as arm builder.html)
+// ---------------------------------------------------------------------------
+const sizeOptions = [
+  { name: 'Standard_B2s', tags: { architectures: ['x64'], generations: ['Gen1','Gen2'], diskControllersByGen: { Gen1: ['SCSI'], Gen2: ['SCSI'] }, vcpus: 2, accelNetMode: 'unsupported', ephemeralOsDiskSupported: true, maxNics: 3, maxDataDisks: 4 } },
+  { name: 'Standard_D2s_v3', tags: { architectures: ['x64'], generations: ['Gen1','Gen2'], diskControllersByGen: { Gen1: ['SCSI'], Gen2: ['SCSI'] }, vcpus: 2, accelNetMode: 'optional', ephemeralOsDiskSupported: true, maxNics: 2, maxDataDisks: 4 } },
+  { name: 'Standard_D2s_v6', tags: { architectures: ['x64'], generations: ['Gen2'], diskControllersByGen: { Gen2: ['NVMe'] }, vcpus: 2, accelNetMode: 'optional', ephemeralOsDiskSupported: false, maxNics: 2, maxDataDisks: 8 } },
+  { name: 'Standard_D2ps_v6', tags: { architectures: ['Arm64'], generations: ['Gen2'], diskControllersByGen: { Gen2: ['SCSI'] }, vcpus: 2, accelNetMode: 'optional', ephemeralOsDiskSupported: false, maxNics: 2, maxDataDisks: 8 } },
+  { name: 'Standard_D4s_v5', tags: { architectures: ['x64'], generations: ['Gen1','Gen2'], diskControllersByGen: { Gen1: ['SCSI'], Gen2: ['SCSI'] }, vcpus: 4, accelNetMode: 'optional', ephemeralOsDiskSupported: false, maxNics: 2, maxDataDisks: 8 } },
+  { name: 'Standard_D4ls_v5', tags: { architectures: ['x64'], generations: ['Gen1','Gen2'], diskControllersByGen: { Gen1: ['SCSI'], Gen2: ['SCSI'] }, vcpus: 4, accelNetMode: 'optional', ephemeralOsDiskSupported: false, maxNics: 2, maxDataDisks: 8 } },
+  { name: 'Standard_E2bds_v5', tags: { architectures: ['x64'], generations: ['Gen1','Gen2'], diskControllersByGen: { Gen1: ['SCSI'], Gen2: ['SCSI','NVMe'] }, vcpus: 2, accelNetMode: 'optional', ephemeralOsDiskSupported: true, maxNics: 2, maxDataDisks: 4 } },
+  { name: 'Standard_E2ps_v6', tags: { architectures: ['Arm64'], generations: ['Gen2'], diskControllersByGen: { Gen2: ['SCSI'] }, vcpus: 2, accelNetMode: 'optional', ephemeralOsDiskSupported: false, maxNics: 2, maxDataDisks: 8 } },
+  { name: 'Standard_F2s_v2', tags: { architectures: ['x64'], generations: ['Gen1','Gen2'], diskControllersByGen: { Gen1: ['SCSI'], Gen2: ['SCSI'] }, vcpus: 2, accelNetMode: 'optional', ephemeralOsDiskSupported: true, maxNics: 2, maxDataDisks: 4 } },
+  { name: 'Standard_L8as_v3', tags: { architectures: ['x64'], generations: ['Gen1','Gen2'], diskControllersByGen: { Gen1: ['SCSI'], Gen2: ['SCSI'] }, vcpus: 8, accelNetMode: 'optional', ephemeralOsDiskSupported: true, maxNics: 4, maxDataDisks: 16 } },
+];
+
+// Adapter: expose flat fields from tags for convenience in scsi2nvme logic
+function sizeInfo(sizeName) {
+  const raw = sizeOptions.find(s => s.name === sizeName) || sizeOptions[0];
+  const t = raw.tags || {};
+  const allControllers = Object.values(t.diskControllersByGen || {}).flat();
+  const uniqueControllers = [...new Set(allControllers)];
+  return {
+    name: raw.name,
+    vcpus: t.vcpus || 0,
+    arch: (t.architectures || [])[0] || 'x64',
+    gens: t.generations || [],
+    controllers: uniqueControllers,
+    accelNet: t.accelNetMode || 'unsupported',
+    ephemeral: !!t.ephemeralOsDiskSupported,
+    tags: t
+  };
+}
+
+function controllersForGen(sizeName, gen) {
+  const raw = sizeOptions.find(s => s.name === sizeName) || sizeOptions[0];
+  const byGen = (raw.tags || {}).diskControllersByGen || {};
+  return byGen[gen] || [];
+}
+
+const ENFORCED_QUOTA_LIMIT = 100;
+const ENFORCED_QUOTA_ALERT_THRESHOLD = 80;
+
+function getQuotaLimit() {
+  const el = $('regionalVcpuLimit');
+  if (!el) return ENFORCED_QUOTA_LIMIT;
+  const v = Number(el.value);
+  return (Number.isFinite(v) && v > 0) ? Math.floor(v) : ENFORCED_QUOTA_LIMIT;
+}
+
+function compatibleSizesForImage(img) {
+  const ctrlFilter = $('filterController') ? $('filterController').value : '';
+  return sizeOptions.map(s => sizeInfo(s.name)).filter(si => {
+    if (si.arch !== img.arch) return false;
+    if (!si.gens.includes(img.gen)) return false;
+    const genCtrls = controllersForGen(si.name, img.gen);
+    if (genCtrls.every(c => c === 'NVMe') && !img.nvmeCapable) return false;
+    if (ctrlFilter === 'nvme' && !genCtrls.includes('NVMe')) return false;
+    if (ctrlFilter === 'scsi-only' && genCtrls.every(c => c === 'NVMe')) return false;
+    return true;
+  }).sort((a, b) => (a.vcpus - b.vcpus) || a.name.localeCompare(b.name));
+}
+
+function sizeForImage(img, idx, strategy) {
+  const forced = $('forcedVmSize') ? $('forcedVmSize').value : '';
+  const ctrlFilter = $('filterController') ? $('filterController').value : '';
+  if (forced) {
+    const fi = sizeInfo(forced);
+    const forcedGenCtrls = controllersForGen(forced, img.gen);
+    if (fi.arch === img.arch && fi.gens.includes(img.gen) &&
+        !(fi.controllers.every(c => c === 'NVMe') && !img.nvmeCapable) &&
+        !(ctrlFilter === 'nvme' && !forcedGenCtrls.includes('NVMe'))) {
+      return forced;
+    }
+  }
+  const compatible = compatibleSizesForImage(img);
+  if (!compatible.length) {
+    if (ctrlFilter) return null;
+    return img.arch === 'Arm64' ? 'Standard_D2ps_v6' : 'Standard_B2s';
+  }
+  if (strategy === 'smallest') return compatible[0].name;
+  return compatible[idx % compatible.length].name;
+}
+
+function accelNetEnabled(sizeInfoObj, idx) {
+  if (sizeInfoObj.accelNet === 'required') return true;
+  if (sizeInfoObj.accelNet === 'unsupported') return false;
+  return idx % 2 === 0;
+}
+
+let _forcedImageKeys = new Set();
+
+function getSelectedForcedImageKeys() {
+  return Array.from(_forcedImageKeys);
+}
+
+function getFilteredImages() {
+  const archFilter = $('filterArch') ? $('filterArch').value : '';
+  const genFilter = $('filterGen') ? $('filterGen').value : '';
+  const ctrlFilter = $('filterController') ? $('filterController').value : '';
+  const pubFilter = $('filterPublisher') ? $('filterPublisher').value : '';
+  return imageOptions.filter(img => {
+    if (archFilter && img.arch !== archFilter) return false;
+    if (genFilter && img.gen !== genFilter) return false;
+    if (ctrlFilter === 'nvme' && !img.nvmeCapable) return false;
+    // SCSI-only: all images support SCSI, no image filtering needed — size selection handles controller
+    if (pubFilter && img.ref.publisher !== pubFilter) return false;
+    // When NVMe filter is active, also verify at least one size supports NVMe for this image's arch+gen
+    if (ctrlFilter === 'nvme') {
+      const hasNvmeSize = sizeOptions.some(s => {
+        const si = sizeInfo(s.name);
+        return si.arch === img.arch && si.gens.includes(img.gen) && controllersForGen(s.name, img.gen).includes('NVMe');
+      });
+      if (!hasNvmeSize) return false;
+    }
+    return true;
+  });
+}
+
+function selectedImages() {
+  if (_forcedImageKeys.size) {
+    const filtered = getFilteredImages();
+    const filteredKeys = new Set(filtered.map(i => i.key));
+    const validKeys = Array.from(_forcedImageKeys).filter(k => filteredKeys.has(k));
+    if (validKeys.length) return imageOptions.filter(i => validKeys.includes(i.key));
+  }
+  return getFilteredImages();
+}
+
+function getPickableImages() {
+  const forcedSize = $('forcedVmSize') ? $('forcedVmSize').value : '';
+  const filtered = getFilteredImages();
+  if (!forcedSize) return filtered;
+  const fi = sizeInfo(forcedSize);
+  return filtered.filter(img => {
+    if (fi.arch !== img.arch) return false;
+    if (!fi.gens.includes(img.gen)) return false;
+    if (fi.controllers.every(c => c === 'NVMe') && !img.nvmeCapable) return false;
+    return true;
+  });
+}
+
+function pruneForcedImageKeys() {
+  const pickable = new Set(getPickableImages().map(i => i.key));
+  _forcedImageKeys.forEach(k => { if (!pickable.has(k)) _forcedImageKeys.delete(k); });
+}
+
+function refreshForcedImageButton() {
+  const btn = $('openImagePickerBtn');
+  if (!btn) return;
+  const pickable = getPickableImages();
+  if (_forcedImageKeys.size === 0) {
+    btn.textContent = `All filtered (${pickable.length} images)`;
+    btn.style.color = 'var(--muted)';
+  } else {
+    btn.textContent = `${_forcedImageKeys.size} of ${pickable.length} selected`;
+    btn.style.color = 'var(--text)';
+  }
+}
+
+function onForcedImagesChanged() {
+  refreshForcedImageButton();
+  saveState();
+  update();
+}
+
+function renderImagePickerBody() {
+  const body = $('imagePickerBody');
+  if (!body) return;
+  body.innerHTML = '';
+  const images = getPickableImages();
+  images.forEach(img => {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = img.key;
+    cb.checked = _forcedImageKeys.has(img.key);
+    cb.onchange = () => {
+      if (cb.checked) _forcedImageKeys.add(img.key); else _forcedImageKeys.delete(img.key);
+      updateImagePickerCount();
+    };
+    const span = document.createElement('span');
+    span.textContent = img.label || img.key;
+    lbl.appendChild(cb);
+    lbl.appendChild(span);
+    body.appendChild(lbl);
+  });
+  updateImagePickerCount();
+}
+
+function updateImagePickerCount() {
+  const el = $('imagePickerCount');
+  const total = $('imagePickerBody') ? $('imagePickerBody').querySelectorAll('input[type="checkbox"]').length : 0;
+  if (el) el.textContent = `${_forcedImageKeys.size} of ${total} selected`;
+}
+
+function openImagePicker() {
+  renderImagePickerBody();
+  $('imagePickerOverlay').classList.add('show');
+}
+
+function closeImagePicker() {
+  $('imagePickerOverlay').classList.remove('show');
+  // Remove keys that are no longer in the pickable set
+  const compatible = new Set(getPickableImages().map(i => i.key));
+  _forcedImageKeys.forEach(k => { if (!compatible.has(k)) _forcedImageKeys.delete(k); });
+  onForcedImagesChanged();
+}
+
+function plannedVmList() {
+  const images = selectedImages();
+  const ctrlFilter = $('filterController') ? $('filterController').value : '';
+  const vmListFromStrategy = (strategy) => {
+    const out = [];
+    images.forEach((img, idx) => {
+      // Determine which controller variants to emit for this image
+      const variants = [];
+      if (ctrlFilter === 'nvme') {
+        variants.push('NVMe');
+      } else if (ctrlFilter === 'scsi-only') {
+        variants.push('SCSI');
+      } else {
+        // "All": always emit SCSI, plus NVMe if a matching NVMe size exists
+        variants.push('SCSI');
+        if (img.nvmeCapable) {
+          const hasNvmeSize = sizeOptions.some(s => {
+            const si = sizeInfo(s.name);
+            return si.arch === img.arch && si.gens.includes(img.gen) && controllersForGen(s.name, img.gen).includes('NVMe');
+          });
+          if (hasNvmeSize) variants.push('NVMe');
+        }
+      }
+
+      variants.forEach(ctrl => {
+        // Pick size: for NVMe variant, only NVMe sizes; for SCSI variant, only SCSI sizes
+        const compatSizes = sizeOptions.map(s => sizeInfo(s.name)).filter(si => {
+          if (si.arch !== img.arch) return false;
+          if (!si.gens.includes(img.gen)) return false;
+          const gc = controllersForGen(si.name, img.gen);
+          if (ctrl === 'NVMe') return gc.includes('NVMe') && img.nvmeCapable;
+          return !gc.every(c => c === 'NVMe'); // SCSI: exclude NVMe-only sizes
+        }).sort((a, b) => (a.vcpus - b.vcpus) || a.name.localeCompare(b.name));
+
+        const size = compatSizes.length ? compatSizes[0].name : (img.arch === 'Arm64' ? 'Standard_D2ps_v6' : 'Standard_B2s');
+        if (!size) return;
+        const si = sizeInfo(size);
+        const suffix = ctrl === 'NVMe' ? '-nvme' : '';
+        const maxBase = 64 - suffix.length;
+        const hostName = (img.key.replace(/_/g, '-').slice(0, maxBase) + suffix);
+        out.push({
+          name: hostName,
+          ip: `10.1.0.${10 + out.length}`,
+          size,
+          image: img.ref,
+          gen: img.gen,
+          arch: img.arch,
+          controller: ctrl,
+          accelNet: accelNetEnabled(si, idx)
+        });
+      });
+    });
+    return out;
+  };
+
+  let vmList = vmListFromStrategy('smallest');
+  let strategyUsed = 'smallest';
+
+  return { images, vmList, strategyUsed };
+}
+
+function splitVmListAcrossRegions(vmList, quotaLimit) {
+  // Fill regions sequentially up to quota (accounting for control VM in region 1)
+  const controlCores = sizeInfo('Standard_B2s').vcpus || 2;
+  const regions = [];
+  let remaining = vmList.slice();
+
+  while (remaining.length > 0) {
+    const regionIdx = regions.length;
+    const regionKey = `region${regionIdx + 1}`;
+    const maxCoresThisRegion = regionIdx === 0 ? quotaLimit - controlCores : quotaLimit;
+    const bucket = [];
+    let usedCores = 0;
+
+    while (remaining.length > 0) {
+      const vm = remaining[0];
+      const vmCores = sizeInfo(vm.size).vcpus || 2;
+      if (usedCores + vmCores > maxCoresThisRegion && bucket.length > 0) break;
+      bucket.push(remaining.shift());
+      usedCores += vmCores;
+    }
+
+    regions.push({ region: regionKey, vmList: bucket, cores: usedCores + (regionIdx === 0 ? controlCores : 0) });
+  }
+
+  return regions;
+}
+
+function buildRegionalPlans() {
+  const basePlan = plannedVmList();
+  const quotaLimit = getQuotaLimit();
+  const controlCores = sizeInfo('Standard_B2s').vcpus || 2;
+  const singleRegionCores = controlCores + basePlan.vmList.reduce((s, vm) => s + (sizeInfo(vm.size).vcpus || 0), 0);
+  const needsSplit = singleRegionCores > quotaLimit;
+
+  const regionPlans = needsSplit
+    ? splitVmListAcrossRegions(basePlan.vmList, quotaLimit)
+    : [{ region: 'region1', vmList: basePlan.vmList, cores: singleRegionCores }];
+
+  return { basePlan, regionPlans, quotaLimit, singleRegionCores, needsSplit };
+}
+
+function projectedCoreUsage(plan) {
+  const controlSize = sizeInfo('Standard_B2s');
+  const controlCores = controlSize && controlSize.vcpus ? controlSize.vcpus : 2;
+  const imageCores = plan.vmList.reduce((sum, vm) => {
+    const si = sizeInfo(vm.size);
+    return sum + (si && si.vcpus ? si.vcpus : 0);
+  }, 0);
+  return controlCores + imageCores;
+}
+
+function urnLabel(ref) {
+  return `${ref.publisher}:${ref.offer}:${ref.sku}:${ref.version}`;
+}
+
+function toBase64Utf8(text) {
+  const bytes = new TextEncoder().encode(String(text || ''));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function gzipToBase64(text) {
+  const input = new TextEncoder().encode(String(text || ''));
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(input);
+  writer.close();
+  const reader = cs.readable.getReader();
+  const chunks = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const totalLen = chunks.reduce((s, c) => s + c.length, 0);
+  const merged = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+  let binary = '';
+  for (let i = 0; i < merged.length; i++) binary += String.fromCharCode(merged[i]);
+  return btoa(binary);
+}
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+function validateSshKey(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'SSH public key is required.';
+  const match = raw.match(/^(\S+)\s+([A-Za-z0-9+/]+={0,3})(?:\s+.*)?$/);
+  if (!match) return 'Use OpenSSH format: <type> <base64> [comment].';
+  const allowedTypes = ['ssh-rsa','ssh-ed25519','ecdsa-sha2-nistp256','ecdsa-sha2-nistp384','ecdsa-sha2-nistp521'];
+  if (!allowedTypes.includes(match[1])) return 'Unsupported key type.';
+  try { if (atob(match[2]).length < 32) return 'Key payload too short.'; } catch(e) { return 'Invalid base64 payload.'; }
+  return '';
+}
+
+// ---------------------------------------------------------------------------
+// ARM Template Generation
+// ---------------------------------------------------------------------------
+async function generateTemplate(sshKey, testYaml, regionPlans) {
+  const CONTROL_VM_NAME = 'scsi2nvme-control-vm';
+  const CONTROL_SIZE = 'Standard_B2s';
+  const CONTROL_IMAGE = { publisher:'RedHat', offer:'RHEL', sku:'9-lvm-gen2', version:'latest' };
+  const isMultiRegion = regionPlans.length > 1;
+
+  // Helper: strip outer ARM brackets for embedding in another expression
+  function armInner(expr) { return expr.startsWith('[') && expr.endsWith(']') ? expr.slice(1, -1) : expr; }
+
+  // Assign IPs per region: region N uses 10.(N*10).0.x/16
+  const regionConfigs = regionPlans.map((rp, idx) => {
+    const n = (idx + 1) * 10;
+    const base = `10.${n}.0`;
+    return {
+      ...rp,
+      idx,
+      addressPrefix: `10.${n}.0.0/16`,
+      subnetPrefix: `${base}.0/24`,
+      ipBase: base,
+      vnetName: `r${idx + 1}-vnet`,
+      nsgName: `r${idx + 1}-nsg`,
+      rgName: `[format('{0}-r${idx + 1}', parameters('rgPrefix'))]`,
+      deployName: `deploy-r${idx + 1}`,
+      namePrefix: `r${idx + 1}`
+    };
+  });
+  const controlIp = `${regionConfigs[0].ipBase}.4`;
+
+  // Build /etc/hosts and inventory across ALL regions
+  const allHosts = [{name: CONTROL_VM_NAME, ip: controlIp}];
+  regionConfigs.forEach(rc => {
+    rc.vmList.forEach((vm, i) => {
+      const vmIp = `${rc.ipBase}.${10 + i}`;
+      vm._ip = vmIp;
+      allHosts.push({name: vm.name, ip: vmIp});
+    });
+  });
+  const hostsEntries = allHosts.map(h => `${h.ip}\t${h.name}`).join('\n');
+  const hostsSyncScript = `cat <<'HOSTS_EOF' >> /etc/hosts\n${hostsEntries}\nHOSTS_EOF`;
+  const inventoryHosts = allHosts.filter(h => h.name !== CONTROL_VM_NAME).map(h => h.name).join('\n');
+
+  const safeYaml = String(testYaml || '').replace(/\r\n/g, '\n');
+  const yamlB64 = await gzipToBase64(safeYaml);
+  const postconvB64 = await gzipToBase64(POSTCONVERSION_YAML);
+
+  // Index HTML for control VM
+  const indexHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>SCSI-to-NVMe Results</title>
+<style>body{font-family:system-ui,sans-serif;margin:20px;background:#f5f5f5}
+.wrap{max-width:1000px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+h1{color:#0078d4;margin:0 0 8px}pre{background:#f8f8f8;border:1px solid #edebe9;border-radius:8px;padding:12px;overflow:auto;max-height:600px;font-size:12px}
+a{color:#0078d4;font-weight:700}</style></head>
+<body><div class="wrap"><h1>SCSI-to-NVMe Test Results</h1>
+<p id="status">Loading results.json...</p>
+<a id="dl" style="display:none" download="results.json">Download results.json</a>
+<pre id="out"></pre>
+<script>
+(async function(){
+  var statusEl = document.getElementById('status');
+  var outEl = document.getElementById('out');
+  var dlEl = document.getElementById('dl');
+  try {
+    var resultsUrl = new URL('/results.json', window.location.href);
+    resultsUrl.searchParams.set('t', Date.now().toString());
+    var r = await fetch(resultsUrl.toString(), { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP '+r.status+' while fetching '+resultsUrl.pathname);
+    var raw = await r.text();
+    var d = JSON.parse(raw);
+    statusEl.textContent = 'Results loaded ('+Object.keys(d).length+' entries)';
+    outEl.textContent = JSON.stringify(d,null,2);
+    var b = new Blob([JSON.stringify(d,null,2)], { type:'application/json' });
+    dlEl.href = URL.createObjectURL(b);
+    dlEl.style.display = 'inline';
+  } catch(err) {
+    statusEl.textContent = 'Unable to load /results.json: ' + (err && err.message ? err.message : 'unknown error');
+  }
+})();
+__SCRIPT_END__</div></body></html>`
+  .replace('__SCRIPT_END__', '<' + '/script>');
+
+  const controlBootstrap = [
+    hostsSyncScript,
+    'useradd -m ansible 2>/dev/null || true',
+    "echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible",
+    'chmod 0440 /etc/sudoers.d/ansible',
+    "mkdir -p /etc/ssh/sshd_config.d",
+    "echo 'StrictHostKeyChecking accept-new' > /etc/ssh/ssh_config.d/99-ansible-lab.conf",
+    "echo 'PubkeyAuthentication yes' > /etc/ssh/sshd_config.d/99-pubkey.conf",
+    "su - ansible -c 'echo | ssh-keygen -t rsa -b 4096 -N \"\" -q'",
+    "cat <<'KEYSERVER_EOF' > /home/ansible/k.py\nimport http.server, socketserver\nclass H(http.server.BaseHTTPRequestHandler):\n    def do_GET(self):\n        if self.path == '/k':\n            try:\n                with open('/home/ansible/.ssh/id_rsa.pub', 'rb') as f: data = f.read()\n                self.send_response(200); self.send_header('Content-Type', 'text/plain'); self.end_headers(); self.wfile.write(data)\n            except: self.send_response(500); self.end_headers()\n        else: self.send_response(404); self.end_headers()\n    def log_message(self, *a): pass\nwith socketserver.TCPServer(('0.0.0.0', 10000), H) as s: s.serve_forever()\nKEYSERVER_EOF",
+    'chown ansible:ansible /home/ansible/k.py',
+    "cat <<'SVC_EOF' > /etc/systemd/system/k.service\n[Unit]\nDescription=Key server\nAfter=network.target\n[Service]\nType=simple\nUser=ansible\nExecStart=/usr/bin/python3 /home/ansible/k.py\nRestart=always\nRestartSec=3\n[Install]\nWantedBy=multi-user.target\nSVC_EOF",
+    'systemctl daemon-reload',
+    'systemctl enable --now k.service',
+    'firewall-cmd --permanent --add-port=10000/tcp --add-port=80/tcp || true; firewall-cmd --reload || true',
+    'dnf install -y ansible-core httpd acl',
+    'systemctl enable --now httpd',
+    'setfacl -R -m u:ansible:rwx /var/www/html',
+    'setfacl -R -d -m u:ansible:rwx /var/www/html',
+    `cat <<'INV_EOF' > /etc/ansible/hosts\n[VMs]\n${inventoryHosts}\nINV_EOF`,
+    `echo '${yamlB64}' | base64 -d | gunzip > /home/ansible/test.yml`,
+    'chown ansible /home/ansible/test.yml',
+    `echo '${postconvB64}' | base64 -d | gunzip > /home/ansible/postconversion-check.yml`,
+    'chown ansible /home/ansible/postconversion-check.yml',
+    `cat <<'HTML_EOF' > /var/www/html/index.html\n${indexHtml}\nHTML_EOF`,
+    `cat <<'WAITER_EOF' > /home/ansible/run-test.sh\n#!/bin/bash\nVM_COUNT=$(ansible --list-hosts VMs 2>/dev/null | tail -n +2 | grep -c '[^[:space:]]')\nMAX_WAIT=1800\nELAPSED=0\nsudo tee /var/www/html/index.html > /dev/null <<'HOLDER'\n<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SCSI-to-NVMe - Waiting</title>\n<style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:#201f1e}\n.c{text-align:center;background:#fff;padding:40px 48px;border-radius:12px;border:1px solid #edebe9;box-shadow:0 2px 8px rgba(0,0,0,.08)}\nh1{color:#0078d4;margin:0 0 8px;font-size:22px}p{color:#605e5c;margin:4px 0;font-size:14px}\n.spin{display:inline-block;width:28px;height:28px;border:3px solid #edebe9;border-top-color:#0078d4;border-radius:50%;animation:s .8s linear infinite;margin-bottom:12px}@keyframes s{to{transform:rotate(360deg)}}</style></head>\n<body><div class="c"><div class="spin"></div><h1>Playbook has not run yet</h1><p>Waiting for all VMs to respond to ping&hellip;</p><p id="st">0 / __VM_COUNT__ VMs online &mdash; elapsed 0s</p><p style="font-size:12px;color:#a0a0a0;margin-top:16px;">This page auto-refreshes every 30 seconds.</p></div></body></html>\nHOLDER\nsudo sed -i "s|__VM_COUNT__|$VM_COUNT|g" /var/www/html/index.html\nwhile [ $ELAPSED -lt $MAX_WAIT ]; do\n  OK=$(ansible -m ping VMs -f 30 -o 2>/dev/null | grep -c SUCCESS)\n  ELAPSED=$((ELAPSED + 15))\n  sudo sed -i "s|<p id=\\"st\\">[^<]*</p>|<p id=\\"st\\">$OK / $VM_COUNT VMs online \\&mdash; elapsed ${'${'}ELAPSED}s</p>|" /var/www/html/index.html 2>/dev/null\n  if [ "$OK" -ge "$VM_COUNT" ] && [ "$VM_COUNT" -gt 0 ]; then\n    sudo sed -i "s|<h1>[^<]*</h1>|<h1>Test playbook running\\&hellip;</h1>|;s|<p>Waiting[^<]*</p>|<p>All $VM_COUNT VMs online. Executing ansible-playbook test.yml</p>|;s|<p id=\\"st\\">[^<]*</p>|<p id=\\"st\\">Started at $(date -u +%H:%M:%S) UTC</p>|" /var/www/html/index.html 2>/dev/null\n    ansible-playbook -f 30 /home/ansible/test.yml 2>&1 | tee /home/ansible/test-run.log\n    exit 0\n  fi\n  sleep 15\ndone\necho "Timed out waiting for all VMs after ${'${'}MAX_WAIT}s" > /home/ansible/test-run.log\nWAITER_EOF`,
+    'chown ansible:ansible /home/ansible/run-test.sh',
+    'chmod +x /home/ansible/run-test.sh',
+    'nohup su - ansible -c "/home/ansible/run-test.sh" > /home/ansible/run-test-bg.log 2>&1 &',
+  ].join('\n');
+
+  const clientBootstrap = [
+    hostsSyncScript,
+    'useradd -m ansible 2>/dev/null || true',
+    "echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible",
+    'chmod 0440 /etc/sudoers.d/ansible',
+    "mkdir -p /etc/ssh/sshd_config.d",
+    "echo 'StrictHostKeyChecking accept-new' > /etc/ssh/ssh_config.d/99-ansible-lab.conf",
+    "echo 'PubkeyAuthentication yes' > /etc/ssh/sshd_config.d/99-pubkey.conf",
+    'systemctl restart sshd || true',
+    'mkdir -p /home/ansible/.ssh',
+    `for i in $(seq 1 30); do KEY=$(curl -fsSL http://${controlIp}:10000/k 2>/dev/null) && break; sleep 10; done`,
+    'if [ -n "$KEY" ]; then echo "$KEY" >> /home/ansible/.ssh/authorized_keys; fi',
+    'chmod 700 /home/ansible/.ssh',
+    'chmod 600 /home/ansible/.ssh/authorized_keys',
+    'chown -R ansible /home/ansible/.ssh',
+  ].join('\n');
+
+  // --- Build inner (resource-group-scope) template for one region ---
+  function buildRegionTemplate(rc, isControlRegion) {
+    const loc = "[parameters('location')]";
+    const innerResources = [];
+
+    // NSG
+    const nsgRules = [
+      { "name": "ssh", "properties": { "access":"Allow","protocol":"Tcp","direction":"Inbound","priority":100,"sourceAddressPrefix":"AzureCloud","sourcePortRange":"*","destinationAddressPrefix":"*","destinationPortRange":"22" } }
+    ];
+    if (isControlRegion) {
+      nsgRules.push({ "name": "http-control", "properties": { "access":"Allow","protocol":"Tcp","direction":"Inbound","priority":110,"sourceAddressPrefix":"AzureCloud","sourcePortRange":"*","destinationAddressPrefix":`${controlIp}`,"destinationPortRange":"80" } });
+    }
+    innerResources.push({
+      "type": "Microsoft.Network/networkSecurityGroups", "apiVersion": "2024-05-01",
+      "name": "[variables('nsgName')]", "location": loc,
+      "properties": { "securityRules": nsgRules }
+    });
+
+    // VNet
+    innerResources.push({
+      "type": "Microsoft.Network/virtualNetworks", "apiVersion": "2024-05-01",
+      "name": "[variables('vnetName')]", "location": loc,
+      "properties": { "addressSpace": { "addressPrefixes": ["[parameters('addressPrefix')]"] } }
+    });
+
+    // Subnet
+    innerResources.push({
+      "type": "Microsoft.Network/virtualNetworks/subnets", "apiVersion": "2024-05-01",
+      "name": "[format('{0}/{1}', variables('vnetName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+      ],
+      "properties": {
+        "addressPrefix": "[parameters('subnetPrefix')]",
+        "networkSecurityGroup": { "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]" }
+      }
+    });
+
+    const subnetRef = "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'default')]";
+
+    // Control VM (only in region 1)
+    if (isControlRegion) {
+      const pipName = `${CONTROL_VM_NAME}-pip`;
+      const nicName = `${CONTROL_VM_NAME}-nic`;
+      const dnsLabel = `[concat('${CONTROL_VM_NAME}-', uniqueString(resourceGroup().id))]`;
+
+      innerResources.push({
+        "type": "Microsoft.Network/publicIPAddresses", "apiVersion": "2024-05-01",
+        "name": pipName, "location": loc, "sku": { "name": "Standard" },
+        "properties": { "publicIPAllocationMethod": "Static", "publicIPAddressVersion": "IPv4",
+          "dnsSettings": { "domainNameLabel": dnsLabel } }
+      });
+
+      innerResources.push({
+        "type": "Microsoft.Network/networkInterfaces", "apiVersion": "2024-05-01",
+        "name": nicName, "location": loc,
+        "dependsOn": [subnetRef, `[resourceId('Microsoft.Network/publicIPAddresses', '${pipName}')]`],
+        "properties": { "enableAcceleratedNetworking": false,
+          "ipConfigurations": [{ "name": "ipconfig1", "properties": {
+            "subnet": { "id": subnetRef }, "privateIPAllocationMethod": "Static", "privateIPAddress": controlIp,
+            "publicIPAddress": { "id": `[resourceId('Microsoft.Network/publicIPAddresses', '${pipName}')]` }
+          }}] }
+      });
+
+      const controlStorageProfile = {
+        "imageReference": CONTROL_IMAGE,
+        "osDisk": { "createOption": "FromImage", "managedDisk": { "storageAccountType": "StandardSSD_LRS" } },
+        "diskControllerType": "SCSI"
+      };
+      innerResources.push({
+        "type": "Microsoft.Compute/virtualMachines", "apiVersion": "2023-03-01",
+        "name": CONTROL_VM_NAME, "location": loc,
+        "dependsOn": [`[resourceId('Microsoft.Network/networkInterfaces', '${nicName}')]`],
+        "properties": {
+          "hardwareProfile": { "vmSize": CONTROL_SIZE },
+          "storageProfile": controlStorageProfile,
+          "networkProfile": { "networkInterfaces": [{ "id": `[resourceId('Microsoft.Network/networkInterfaces', '${nicName}')]`, "properties": { "primary": true } }] },
+          "osProfile": {
+            "computerName": CONTROL_VM_NAME,
+            "adminUsername": "[parameters('adminUsername')]",
+            "customData": toBase64Utf8(`#!/bin/bash\n${controlBootstrap}`),
+            "linuxConfiguration": {
+              "disablePasswordAuthentication": true,
+              "ssh": { "publicKeys": [{ "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]", "keyData": "[parameters('sshPublicKey')]" }] }
+            }
+          },
+          "diagnosticsProfile": { "bootDiagnostics": { "enabled": true } }
+        }
+      });
+    }
+
+    // Image VMs for this region
+    rc.vmList.forEach((vm, i) => {
+      const vmIp = vm._ip;
+      const nicName = `${vm.name}-nic`;
+      const vmDepends = [`[resourceId('Microsoft.Network/networkInterfaces', '${nicName}')]`];
+      if (isControlRegion) vmDepends.push(`[resourceId('Microsoft.Compute/virtualMachines', '${CONTROL_VM_NAME}')]`);
+
+      innerResources.push({
+        "type": "Microsoft.Network/networkInterfaces", "apiVersion": "2024-05-01",
+        "name": nicName, "location": loc,
+        "dependsOn": [subnetRef],
+        "properties": { "enableAcceleratedNetworking": !!vm.accelNet,
+          "ipConfigurations": [{ "name": "ipconfig1", "properties": {
+            "subnet": { "id": subnetRef }, "privateIPAllocationMethod": "Static", "privateIPAddress": vmIp
+          }}] }
+      });
+
+      const storageProfile = {
+        "imageReference": vm.image,
+        "osDisk": { "createOption": "FromImage", "managedDisk": { "storageAccountType": "StandardSSD_LRS" } }
+      };
+      if (vm.gen === 'Gen2') storageProfile.diskControllerType = vm.controller || 'SCSI';
+
+      innerResources.push({
+        "type": "Microsoft.Compute/virtualMachines", "apiVersion": "2023-03-01",
+        "name": vm.name, "location": loc, "dependsOn": vmDepends,
+        "properties": {
+          "hardwareProfile": { "vmSize": vm.size },
+          "storageProfile": storageProfile,
+          "networkProfile": { "networkInterfaces": [{ "id": `[resourceId('Microsoft.Network/networkInterfaces', '${nicName}')]`, "properties": { "primary": true } }] },
+          "osProfile": {
+            "computerName": vm.name,
+            "adminUsername": "[parameters('adminUsername')]",
+            "customData": toBase64Utf8(`#!/bin/bash\n${clientBootstrap}`),
+            "linuxConfiguration": {
+              "disablePasswordAuthentication": true,
+              "ssh": { "publicKeys": [{ "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]", "keyData": "[parameters('sshPublicKey')]" }] }
+            }
+          },
+          "diagnosticsProfile": { "bootDiagnostics": { "enabled": true } }
+        }
+      });
+    });
+
+    return {
+      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "location": { "type": "string" },
+        "addressPrefix": { "type": "string" },
+        "subnetPrefix": { "type": "string" },
+        "adminUsername": { "type": "string" },
+        "sshPublicKey": { "type": "string" }
+      },
+      "variables": {
+        "vnetName": rc.vnetName,
+        "nsgName": rc.nsgName
+      },
+      "resources": innerResources,
+      "outputs": isControlRegion ? {
+        "controlVmFqdn": { "type": "string", "value": `[reference(resourceId('Microsoft.Network/publicIPAddresses', '${CONTROL_VM_NAME}-pip')).dnsSettings.fqdn]` }
+      } : {}
+    };
+  }
+
+  // --- Single region: use simple resource-group-scope template ---
+  if (!isMultiRegion) {
+    const rc = regionConfigs[0];
+    const inner = buildRegionTemplate(rc, true);
+    // Flatten: remove location parameter, use [resourceGroup().location]
+    delete inner.parameters.location;
+    delete inner.parameters.addressPrefix;
+    delete inner.parameters.subnetPrefix;
+    inner.parameters.sshPublicKey = { "type": "string", "defaultValue": sshKey };
+    inner.parameters.adminUsername = { "type": "string", "defaultValue": "azureuser" };
+    inner.variables.addressPrefix = rc.addressPrefix;
+    inner.variables.subnetPrefix = rc.subnetPrefix;
+    // Replace [parameters('location')] with [resourceGroup().location] in all resources
+    const jsonStr = JSON.stringify(inner).replace(/\[parameters\('location'\)\]/g, "[resourceGroup().location]")
+      .replace(/\[parameters\('addressPrefix'\)\]/g, `[variables('addressPrefix')]`)
+      .replace(/\[parameters\('subnetPrefix'\)\]/g, `[variables('subnetPrefix')]`)
+      .replace(/\[parameters\('sshPublicKey'\)\]/g, `[parameters('sshPublicKey')]`)
+      .replace(/\[parameters\('adminUsername'\)\]/g, `[parameters('adminUsername')]`);
+    return JSON.parse(jsonStr);
+  }
+
+  // --- Multi-region: subscription-scope template ---
+
+  const subParams = {};
+
+  // Region parameters first (regions 2+; region 1 comes from deployment location)
+  const azureRegions = [
+    "australiacentral","australiaeast","australiasoutheast","brazilsouth","canadacentral","canadaeast",
+    "centralindia","centralus","eastasia","eastus","eastus2","francecentral","germanywestcentral",
+    "italynorth","japaneast","japanwest","koreacentral","northcentralus","northeurope","norwayeast",
+    "polandcentral","qatarcentral","southafricanorth","southcentralus","southeastasia","southindia",
+    "swedencentral","switzerlandnorth","uaenorth","uksouth","ukwest","westcentralus","westeurope",
+    "westus","westus2","westus3"
+  ];
+  const defaultRegions = ['westus2', 'eastus2', 'northeurope', 'westeurope', 'southeastasia'];
+  for (let i = 1; i < regionConfigs.length; i++) {
+    subParams[`region${i + 1}`] = {
+      "type": "string",
+      "defaultValue": defaultRegions[(i - 1) % defaultRegions.length],
+      "allowedValues": azureRegions,
+      "metadata": { "description": `Region ${i + 1} location` }
+    };
+  }
+
+  // Then user/infra parameters
+  subParams["rgPrefix"] = { "type": "string", "defaultValue": "scsi2nvme-lab" };
+  subParams["adminUsername"] = { "type": "string", "defaultValue": "azureuser" };
+  subParams["sshPublicKey"] = { "type": "string", "defaultValue": sshKey };
+
+  const subVars = { "region1": "[deployment().location]" };
+  const subResources = [];
+
+  // Create resource groups
+  regionConfigs.forEach((rc, idx) => {
+    const locExpr = idx === 0 ? "[variables('region1')]" : `[parameters('region${idx + 1}')]`;
+    subResources.push({
+      "type": "Microsoft.Resources/resourceGroups", "apiVersion": "2022-09-01",
+      "name": rc.rgName, "location": locExpr
+    });
+  });
+
+  // Create nested deployments per region
+  regionConfigs.forEach((rc, idx) => {
+    const locExpr = idx === 0 ? "[variables('region1')]" : `[parameters('region${idx + 1}')]`;
+    const isControlRegion = idx === 0;
+    const innerTemplate = buildRegionTemplate(rc, isControlRegion);
+
+    const depends = [`[resourceId('Microsoft.Resources/resourceGroups', ${armInner(rc.rgName)})]`];
+    // Spoke regions depend on region 1 deployment (so control VM + key server are ready)
+    if (!isControlRegion) {
+      depends.push('deploy-r1');
+    }
+
+    subResources.push({
+      "type": "Microsoft.Resources/deployments", "apiVersion": "2022-09-01",
+      "name": rc.deployName,
+      "resourceGroup": rc.rgName,
+      "dependsOn": depends,
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": { "scope": "inner" },
+        "parameters": {
+          "location": { "value": locExpr },
+          "addressPrefix": { "value": rc.addressPrefix },
+          "subnetPrefix": { "value": rc.subnetPrefix },
+          "adminUsername": { "value": "[parameters('adminUsername')]" },
+          "sshPublicKey": { "value": "[parameters('sshPublicKey')]" }
+        },
+        "template": innerTemplate
+      }
+    });
+  });
+
+  // VNet peering: hub (region 1) <-> each spoke
+  for (let i = 1; i < regionConfigs.length; i++) {
+    const hub = regionConfigs[0];
+    const spoke = regionConfigs[i];
+
+    // Hub -> spoke peering (deployed in hub's RG)
+    subResources.push({
+      "type": "Microsoft.Resources/deployments", "apiVersion": "2022-09-01",
+      "name": `peer-r1-to-r${i + 1}`,
+      "resourceGroup": hub.rgName,
+      "dependsOn": [
+        `${hub.deployName}`,
+        `${spoke.deployName}`
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": { "scope": "inner" },
+        "parameters": {
+          "localVnetName": { "value": hub.vnetName },
+          "remoteVnetId": { "value": `[resourceId(subscription().subscriptionId, ${armInner(spoke.rgName)}, 'Microsoft.Network/virtualNetworks', '${spoke.vnetName}')]` }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": { "localVnetName": { "type": "string" }, "remoteVnetId": { "type": "string" } },
+          "resources": [{
+            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings", "apiVersion": "2024-05-01",
+            "name": `[format('{0}/peer-to-r${i + 1}', parameters('localVnetName'))]`,
+            "properties": {
+              "remoteVirtualNetwork": { "id": "[parameters('remoteVnetId')]" },
+              "allowVirtualNetworkAccess": true,
+              "allowForwardedTraffic": true
+            }
+          }]
+        }
+      }
+    });
+
+    // Spoke -> hub peering (deployed in spoke's RG)
+    subResources.push({
+      "type": "Microsoft.Resources/deployments", "apiVersion": "2022-09-01",
+      "name": `peer-r${i + 1}-to-r1`,
+      "resourceGroup": spoke.rgName,
+      "dependsOn": [
+        `${hub.deployName}`,
+        `${spoke.deployName}`
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": { "scope": "inner" },
+        "parameters": {
+          "localVnetName": { "value": spoke.vnetName },
+          "remoteVnetId": { "value": `[resourceId(subscription().subscriptionId, ${armInner(hub.rgName)}, 'Microsoft.Network/virtualNetworks', '${hub.vnetName}')]` }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": { "localVnetName": { "type": "string" }, "remoteVnetId": { "type": "string" } },
+          "resources": [{
+            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings", "apiVersion": "2024-05-01",
+            "name": `[format('{0}/peer-to-r1', parameters('localVnetName'))]`,
+            "properties": {
+              "remoteVirtualNetwork": { "id": "[parameters('remoteVnetId')]" },
+              "allowVirtualNetworkAccess": true,
+              "allowForwardedTraffic": true
+            }
+          }]
+        }
+      }
+    });
+  }
+
+  return {
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": subParams,
+    "variables": subVars,
+    "resources": subResources,
+    "outputs": {
+      "controlVmResourceGroup": { "type": "string", "value": regionConfigs[0].rgName },
+      "region1": { "type": "string", "value": "[variables('region1')]" }
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+
+const DEFAULT_TEST_YAML = String.raw`---
+# =============================================================================
+# SCSI-to-NVMe Conversion Dry-Run Assessment Playbook
+# Run: ansible-playbook -i inventory nvme-dryrun-playbook.yml
+# Output: /var/www/html/results.json (single JSON file with all hosts)
+# =============================================================================
+- name: NVMe Conversion Dry-Run Assessment
+  hosts: all
+  become: true
+  gather_facts: true
+  any_errors_fatal: false
+
+  tasks:
+    # ── 1. Deploy and run the NVMe dry-run check script ──────────────────
+    - name: Copy NVMe dry-run check script to target
+      ansible.builtin.copy:
+        dest: /tmp/nvme-check-dryrun.sh
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          fix=true
+          dry_run=true
+          distro=""
+          staging_dir=""
+
+          setup_dryrun() {
+              staging_dir="/tmp/nvme-conversion-dryrun"
+              rm -rf "$staging_dir"
+              mkdir -p "$staging_dir/original" "$staging_dir/modified" "$staging_dir/diffs"
+              echo "$(hostname)" > "$staging_dir/hostname"
+              echo "$distro" > "$staging_dir/distro"
+              uname -r > "$staging_dir/kernel"
+              echo "[INFO] Dry-run mode: staging changes in $staging_dir"
+          }
+
+          if [ -f /etc/os-release ]; then
+              source /etc/os-release
+              distro="$ID"
+          elif [ -f /etc/debian_version ]; then distro="debian"
+          elif [ -f /etc/SuSE-release ]; then distro="suse"
+          elif [ -f /etc/redhat-release ]; then distro="redhat"
+          elif [ -f /etc/centos-release ]; then distro="centos"
+          elif [ -f /etc/rocky-release ]; then distro="rocky"
+          else echo "[ERROR] Unsupported distribution."; exit 1; fi
+          echo "[INFO] Operating system detected: $distro"
+
+          setup_dryrun
+
+          check_nvme_driver() {
+              echo "[INFO] Checking if NVMe driver is available for boot..."
+              if grep -qw nvme "/lib/modules/$(uname -r)/modules.builtin" 2>/dev/null; then
+                  echo "[INFO] NVMe driver is built into the kernel. No initramfs entry needed."
+                  echo "[DRYRUN] NVMe driver is built-in (kernel $(uname -r)). No initramfs or dracut changes needed."
+                  echo "nvme_builtin=true" > "$staging_dir/modified/nvme-driver-status.txt"
+                  echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
+                  grep -w nvme "/lib/modules/$(uname -r)/modules.builtin" >> "$staging_dir/modified/nvme-driver-status.txt"
+                  return 0
+              fi
+              echo "[INFO] NVMe is not built-in. Checking initrd/initramfs..."
+              case "$distro" in
+                  ubuntu|debian)
+                      _initramfs_ok=true
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -q nvme; then
+                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
+                          _initramfs_ok=false
+                      fi
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                          echo "[WARNING] pci-hyperv/hv_pci driver not found in initrd/initramfs (required for Azure NVMe)."
+                          _initramfs_ok=false
+                      fi
+                      if $_initramfs_ok; then
+                          echo "[INFO] NVMe driver found in initrd/initramfs."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in initramfs. No changes needed."
+                          echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
+                          echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
+                      else
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk."
+                          echo "[DRYRUN] Would run: update-initramfs -u -k all"
+                          echo "update-initramfs -u -k all" > "$staging_dir/modified/initramfs-commands.txt"
+                      fi ;;
+                  redhat|rhel|centos|rocky|almalinux|azurelinux|mariner|suse|sles|ol)
+                      # Fix 10: check ALL installed initramfs images, not just the running kernel
+                      _nvme_missing=false
+                      for _img in /boot/initramfs-*.img; do
+                          [ -f "$_img" ] || continue
+                          [[ "$_img" == *kdump* ]] && continue
+                          [[ "$_img" == *rescue* ]] && continue
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -q nvme; then
+                              echo "[WARNING] NVMe driver not found in $_img"
+                              _nvme_missing=true
+                          fi
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                              echo "[WARNING] pci-hyperv/hv_pci driver not found in $_img (required for Azure NVMe)"
+                              _nvme_missing=true
+                          fi
+                      done
+                      if ! $_nvme_missing; then
+                          echo "[INFO] NVMe and pci-hyperv drivers found in initrd/initramfs."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in all initramfs images. No changes needed."
+                          echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
+                          echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
+                      else
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in all initramfs images."
+                          echo "[DRYRUN] Would run: dracut -f --regenerate-all (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
+                          echo 'add_drivers+=" nvme nvme-core pci-hyperv "' > "$staging_dir/modified/dracut-nvme.conf"
+                          echo "dracut -f --regenerate-all" > "$staging_dir/modified/initramfs-commands.txt"
+                      fi ;;
+                  *) echo "[ERROR] Unsupported distribution for NVMe driver check."; return 1 ;;
+              esac
+          }
+
+          check_nvme_timeout() {
+              echo "[INFO] Checking nvme_core.io_timeout parameter..."
+              # Build grub file list dynamically for verification
+              _grub_check_files="/etc/default/grub"
+              if [ -f /boot/grub2/grub.cfg ]; then
+                  _grub_check_files="$_grub_check_files /boot/grub2/grub.cfg"
+              elif [ -f /boot/grub/grub.cfg ]; then
+                  _grub_check_files="$_grub_check_files /boot/grub/grub.cfg"
+              fi
+              if grep -q "nvme_core.io_timeout=240" $_grub_check_files 2>/dev/null; then
+                  echo "[INFO] nvme_core.io_timeout is set to 240."
+                  echo "[DRYRUN] nvme_core.io_timeout already set to 240. No grub changes needed."
+                  echo "nvme_core_io_timeout=240" > "$staging_dir/modified/nvme-timeout-status.txt"
+                  echo "status=already_configured" >> "$staging_dir/modified/nvme-timeout-status.txt"
+              elif command -v grubby &>/dev/null && grubby --info=ALL 2>/dev/null | grep -q "nvme_core.io_timeout=240"; then
+                  echo "[INFO] nvme_core.io_timeout is set to 240 (BLS entries)."
+              else
+                  echo "[WARNING] nvme_core.io_timeout is not set to 240."
+                  echo "[DRYRUN] Staging grub changes..."
+                  local grub_file=""
+                  [ -f /etc/default/grub ] && grub_file="/etc/default/grub"
+                  if [ -n "$grub_file" ]; then
+                      cp "$grub_file" "$staging_dir/original/grub"
+                      cp "$grub_file" "$staging_dir/modified/grub"
+                      case "$distro" in
+                          ubuntu|debian) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          suse|sles|opensuse*) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          ol) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          *) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                      esac
+                      diff -u "$staging_dir/original/grub" "$staging_dir/modified/grub" > "$staging_dir/diffs/grub.diff" 2>&1 || true
+                      echo "[DRYRUN] Grub diff staged in $staging_dir/diffs/grub.diff"
+                      cat "$staging_dir/diffs/grub.diff"
+                      # Check for BLS (BootLoaderSpec) — RHEL 8+, AlmaLinux 8+, OL 8.10+
+                      if grep -q "GRUB_ENABLE_BLSCFG=true" "$grub_file" 2>/dev/null; then
+                          echo "[INFO] BLS (BootLoaderSpec) is enabled."
+                          if command -v grubby &>/dev/null; then
+                              echo "[DRYRUN] Would run: grubby --update-kernel=ALL --args=nvme_core.io_timeout=240"
+                              echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                              echo "grubby_available=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                          else
+                              echo "[WARNING] BLS is enabled but grubby is not installed."
+                              echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                              echo "grubby_available=false" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                          fi
+                      fi
+                  else
+                      echo "[DRYRUN] No grub config found to stage."
+                  fi
+              fi
+          }
+
+          check_fstab() {
+              echo "[INFO] Checking /etc/fstab for deprecated device names..."
+              # NOTE: /dev/mapper/* (LVM) and PARTUUID= paths survive NVMe conversion
+              # because they use UUID-based addressing underneath. Only /dev/sd* and
+              # /dev/disk/azure/scsi* paths break when disks move from SCSI to NVMe.
+              if grep -Eq '/dev/sd[a-z][0-9]*|/dev/disk/azure/scsi[0-9]*/lun[0-9]*' /etc/fstab; then
+                  echo "[WARNING] /etc/fstab contains deprecated device names."
+                  echo "[DRYRUN] Staging fstab changes..."
+                  cp /etc/fstab "$staging_dir/original/fstab"
+                  while read -r line; do
+                      if [[ "$line" =~ ^[^#] ]]; then
+                          device=$(echo "$line" | awk '{print $1}')
+                          if [[ "$device" =~ ^/dev/sd[a-z][0-9]*$ ]] || [[ "$device" =~ ^/dev/disk/azure/scsi[0-9]*/lun[0-9]* ]]; then
+                              uuid=$(blkid "$device" 2>/dev/null | awk -F\" '/UUID=/ {print $2}')
+                              if [ -n "$uuid" ]; then
+                                  newline=$(echo "$line" | sed "s|$device|UUID=$uuid|g")
+                                  echo "[DRYRUN] Would replace $device with UUID=$uuid"
+                                  echo "$newline" >> "$staging_dir/modified/fstab"
+                              else
+                                  echo "[DRYRUN] Could not find UUID for $device. Would skip."
+                                  echo "$line" >> "$staging_dir/modified/fstab"
+                              fi
+                          else
+                              echo "$line" >> "$staging_dir/modified/fstab"
+                          fi
+                      else
+                          echo "$line" >> "$staging_dir/modified/fstab"
+                      fi
+                  done < /etc/fstab
+                  diff -u "$staging_dir/original/fstab" "$staging_dir/modified/fstab" > "$staging_dir/diffs/fstab.diff" 2>&1 || true
+                  echo "[DRYRUN] Fstab diff staged in $staging_dir/diffs/fstab.diff"
+                  cat "$staging_dir/diffs/fstab.diff"
+              else
+                  echo "[INFO] /etc/fstab does not contain deprecated device names."
+              fi
+          }
+
+          check_nvme_driver
+          check_nvme_timeout
+          check_fstab
+
+          echo ""
+          echo "[DRYRUN] ============================================"
+          echo "[DRYRUN] Summary report for $(hostname)"
+          echo "[DRYRUN] Distro: $distro | Kernel: $(uname -r)"
+          echo "[DRYRUN] Staging directory: $staging_dir"
+          echo "[DRYRUN] ============================================"
+          echo "[DRYRUN] Files in staging directory:"
+          find "$staging_dir" -type f | sort | while read -r f; do
+              echo "[DRYRUN]   $f"
+          done
+          echo "[DRYRUN] ============================================"
+          echo "[DRYRUN] No system files were modified."
+          exit 0
+
+    - name: Execute dry-run check script
+      ansible.builtin.command: /tmp/nvme-check-dryrun.sh
+      register: dryrun_output
+      changed_when: false
+      failed_when: false
+
+    # ── 2. Parse script output into structured data ─────────────────────────
+    - name: Parse script output lines
+      ansible.builtin.set_fact:
+        nvme_result:
+          hostname: "{{ inventory_hostname }}"
+          fqdn: "{{ ansible_fqdn | default(inventory_hostname) }}"
+          ip: "{{ ansible_default_ipv4.address | default('unknown') }}"
+          distro: "{{ ansible_distribution | default('unknown') | lower }}"
+          distro_version: "{{ ansible_distribution_version | default('unknown') }}"
+          kernel: "{{ ansible_kernel | default('unknown') }}"
+          exit_code: "{{ dryrun_output.rc }}"
+          errors: "{{ dryrun_output.stdout_lines | select('search', '\\[ERROR\\]') | list }}"
+          warnings: "{{ dryrun_output.stdout_lines | select('search', '\\[WARNING\\]') | list }}"
+          info: "{{ dryrun_output.stdout_lines | select('search', '\\[INFO\\]') | list }}"
+          dryrun: "{{ dryrun_output.stdout_lines | select('search', '\\[DRYRUN\\]') | list }}"
+          error_count: "{{ dryrun_output.stdout_lines | select('search', '\\[ERROR\\]') | list | length }}"
+          warning_count: "{{ dryrun_output.stdout_lines | select('search', '\\[WARNING\\]') | list | length }}"
+          raw_stdout: "{{ dryrun_output.stdout }}"
+          raw_stderr: "{{ dryrun_output.stderr }}"
+
+    # ── 3. Collect staged files from the dry-run directory ──────────────────
+    - name: Check if staging directory exists
+      ansible.builtin.stat:
+        path: /tmp/nvme-conversion-dryrun
+      register: staging_stat
+
+    - name: List staged files
+      ansible.builtin.find:
+        paths: /tmp/nvme-conversion-dryrun
+        recurse: true
+        file_type: file
+      register: staged_files
+      when: staging_stat.stat.exists
+
+    - name: Read staged file contents
+      ansible.builtin.slurp:
+        src: "{{ item.path }}"
+      register: staged_contents
+      loop: "{{ staged_files.files | default([]) }}"
+      when: staging_stat.stat.exists
+
+    - name: Build staged files map
+      ansible.builtin.set_fact:
+        staged_files_map: >-
+          {{ staged_files_map | default({}) | combine({ item.item.path | replace('/tmp/nvme-conversion-dryrun/', ''): item.content | b64decode }) }}
+      loop: "{{ staged_contents.results | default([]) }}"
+      when: staging_stat.stat.exists and item.content is defined
+      no_log: true
+
+    - name: Attach staged files to result
+      ansible.builtin.set_fact:
+        nvme_result: "{{ nvme_result | combine({'staged_files': staged_files_map | default({})}) }}"
+
+    # ── 4. Determine readiness status ───────────────────────────────────────
+    - name: Set readiness status
+      ansible.builtin.set_fact:
+        nvme_result: >-
+          {{ nvme_result | combine({ 'ready': (nvme_result.error_count | int == 0), 'needs_changes': (nvme_result.warning_count | int > 0) }) }}
+
+    # ── 5. Cleanup remote artifacts ─────────────────────────────────────────
+    - name: Remove dry-run script from target
+      ansible.builtin.file:
+        path: /tmp/nvme-check-dryrun.sh
+        state: absent
+
+    - name: Remove staging directory from target
+      ansible.builtin.file:
+        path: /tmp/nvme-conversion-dryrun
+        state: absent
+
+  post_tasks:
+    - name: Debug per-host result
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: ready={{ nvme_result.ready }}
+          errors={{ nvme_result.error_count }}
+          warnings={{ nvme_result.warning_count }}
+      when: nvme_result is defined
+
+# =============================================================================
+# Second play: aggregate all hosts into a single JSON file on localhost
+# =============================================================================
+- name: Generate consolidated NVMe report
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Find hosts with collected data
+      set_fact:
+        _collected: "{{ _collected | default([]) + [item] }}"
+      loop: "{{ groups['all'] }}"
+      when: hostvars[item].nvme_result is defined
+      no_log: true
+
+    - name: Build combined report from all hosts
+      set_fact:
+        combined_report:
+          _meta:
+            description: "SCSI-to-NVMe Conversion Dry-Run Assessment - {{ groups['all'] | length }} hosts"
+            total_hosts: "{{ groups['all'] | length }}"
+            generated_at: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+          summary:
+            total: "{{ _collected | default([]) | length }}"
+            ready: "{{ _collected | default([]) | map('extract', hostvars, 'nvme_result') | selectattr('ready') | list | length }}"
+            needs_changes: "{{ _collected | default([]) | map('extract', hostvars, 'nvme_result') | selectattr('needs_changes') | list | length }}"
+            with_errors: "{{ _collected | default([]) | map('extract', hostvars, 'nvme_result') | rejectattr('error_count', 'equalto', '0') | list | length }}"
+          hosts: "{{ dict(_collected | default([]) | zip(_collected | default([]) | map('extract', hostvars, 'nvme_result'))) }}"
+
+    - name: Ensure /var/www/html directory exists
+      file:
+        path: /var/www/html
+        state: directory
+
+    - name: Write /var/www/html/results.json
+      copy:
+        dest: /var/www/html/results.json
+        content: "{{ combined_report | to_nice_json }}"
+
+    - name: Generate NVMe validation HTML report
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>SCSI-to-NVMe Conversion Assessment Report</title>
+          <style>
+          :root{--b:#edebe9;--t:#201f1e;--m:#605e5c;--p:#0078d4;--hb:#0078d4;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;--sans:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+          *{box-sizing:border-box}
+          body{margin:0;font:14px var(--sans);color:var(--t);background:#fff;-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh}
+          .hd{background:var(--hb);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+          .hd h1{margin:0;font-size:16px;font-weight:800}
+          .hd .sp{flex:1}
+          .gb{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:8px;padding:3px 6px;font-size:10px;font-weight:700;cursor:pointer;text-decoration:none}
+          .gb:hover{background:rgba(255,255,255,.22)}
+          .gb svg{width:14px;height:14px;fill:currentColor}
+          .app{display:flex;height:calc(100vh - 42px)}
+          .sb{width:300px;min-width:240px;border-right:1px solid var(--b);overflow-y:auto;background:#fafafa;flex-shrink:0}
+          .vi{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--b);font-size:12px;display:flex;flex-direction:column;gap:2px}
+          .vi:hover{background:#e8f0f8}
+          .vi.on{background:var(--p);color:#fff}
+          .vi.on .vm{color:rgba(255,255,255,.75)}
+          .vn{font-weight:700;font-size:12px}
+          .vm{color:var(--m);font-size:11px}
+          .vp{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}
+          .mn{flex:1;overflow-y:auto;padding:16px}
+          .pn{display:none}
+          .pn.on{display:block}
+          .pt{font-size:16px;font-weight:800;margin:0 0 4px}
+          .ps{font-size:13px;color:var(--m);margin:0 0 12px}
+          .sc{background:#fff;border:1px solid var(--b);border-radius:10px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-top:12px}
+          .sc:first-child{margin-top:0}
+          .sc h4{font-size:13px;font-weight:900;margin:0 0 6px;color:var(--p);border-bottom:1px solid var(--b);padding-bottom:4px}
+          .kv{display:grid;grid-template-columns:150px 1fr;gap:1px 10px;font-size:12px;margin:4px 0}
+          .kv .k{font-weight:700;color:var(--m)}.kv .v{word-break:break-all}
+          pre.d{background:#f8f8f8;border:1px solid var(--b);border-radius:6px;padding:6px;font:11px/1.35 var(--mono);overflow-x:auto;max-height:220px;white-space:pre-wrap;margin:4px 0}
+          .pl{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:900;white-space:nowrap}
+          .pe{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+          .pw{background:#fff7e6;color:#856404;border:1px solid #f3d08b}
+          .po{background:#ecfdf3;color:#155724;border:1px solid #b7e3c4}
+          .pi{background:#e8f0f8;color:#004085;border:1px solid #c9d8e6}
+          .sum{margin:12px 0;padding:12px;background:#faf9f8;border:1px solid var(--b);border-radius:10px;font-size:13px}
+          .sum b{font-size:18px}
+          </style>
+          </head>
+          <body>
+          <div class="hd">
+            <h1>SCSI-to-NVMe Conversion Assessment</h1>
+            <span class="sp"></span>
+            <a class="gb" href="results.json" download><svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-5 1h10v1H3v-1z"/></svg> JSON</a>
+          </div>
+
+          {# ── Macros ── #}
+          {% macro kv(l, v) %}<div class="k">{{ l }}</div><div class="v">{{ v }}</div>{% endmacro %}
+          {% macro pre(lines) %}<pre class="d">{% for l in lines %}{{ l }}
+          {% endfor %}</pre>{% endmacro %}
+
+          {# ── Summary ── #}
+          {% set all_rows = [] %}
+          {% set total = combined_report.hosts | length %}
+          {% set ready_count = combined_report.hosts.values() | selectattr('ready') | list | length %}
+          {% set changes_count = combined_report.hosts.values() | selectattr('needs_changes') | list | length %}
+          {% set error_count = combined_report.hosts.values() | rejectattr('error_count', 'equalto', '0') | list | length %}
+
+          <div class="app">
+          <div class="sb" id="sb">
+          <div class="sum">
+            <b>{{ total }}</b> hosts scanned<br>
+            <span class="pl po">{{ ready_count }} Ready</span>
+            <span class="pl pw">{{ changes_count }} Need Changes</span>
+            <span class="pl pe">{{ error_count }} Errors</span>
+          </div>
+          {% for sku, h in combined_report.hosts.items() | sort %}
+            {% set _ = all_rows.append({'sku': sku, 'h': h, 'idx': loop.index0}) %}
+            <div class="vi{% if loop.first %} on{% endif %}" onclick="showVM({{ loop.index0 }})" id="n{{ loop.index0 }}">
+              <span class="vn">{{ h.hostname | default(sku) }}</span>
+              <span class="vm">{{ h.distro | default('') }} {{ h.distro_version | default('') }} &mdash; {{ h.kernel | default('') }}</span>
+              <span class="vp">
+                {% if h.ready %}<span class="pl po">Ready</span>{% endif %}
+                {% if h.needs_changes %}<span class="pl pw">Needs Changes</span>{% endif %}
+                {% if h.error_count | int > 0 %}<span class="pl pe">{{ h.error_count }} Errors</span>{% endif %}
+              </span>
+            </div>
+          {% endfor %}
+          </div>
+
+          <div class="mn" id="mn">
+          {% for r in all_rows %}
+          {% set h = r.h %}
+          <div class="pn{% if loop.first %} on{% endif %}" id="v{{ r.idx }}">
+            <div class="pt">{{ h.hostname | default(r.sku) }}</div>
+            <div class="ps">{{ h.distro | default('') }} {{ h.distro_version | default('') }} &mdash; Kernel {{ h.kernel | default('') }} &mdash; {{ h.ip | default('') }}</div>
+
+            <div class="sc"><h4>NVMe Readiness</h4>
+            <div class="kv">
+            {{ kv('Ready', h.ready) }}
+            {{ kv('Needs Changes', h.needs_changes) }}
+            {{ kv('Exit Code', h.exit_code | default('')) }}
+            {{ kv('Errors', h.error_count | default(0)) }}
+            {{ kv('Warnings', h.warning_count | default(0)) }}
+            </div></div>
+
+            {% if h.errors | default([]) | length > 0 %}
+            <div class="sc"><h4>Errors</h4>{{ pre(h.errors) }}</div>
+            {% endif %}
+
+            {% if h.warnings | default([]) | length > 0 %}
+            <div class="sc"><h4>Warnings</h4>{{ pre(h.warnings) }}</div>
+            {% endif %}
+
+            <div class="sc"><h4>Dry-Run Actions</h4>{{ pre(h.dryrun | default([])) }}</div>
+
+            <div class="sc"><h4>Info Messages</h4>{{ pre(h.info | default([])) }}</div>
+
+            {% if h.staged_files is defined and h.staged_files | length > 0 %}
+            <div class="sc"><h4>Staged Files</h4>
+            {% for fname, content in (h.staged_files | default({})).items() %}
+              <b>{{ fname }}:</b><pre class="d">{{ content }}</pre>
+            {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="sc"><h4>Full Output</h4><pre class="d">{{ h.raw_stdout | default('') }}</pre></div>
+            {% if h.raw_stderr | default('') | length > 0 %}
+            <div class="sc"><h4>Stderr</h4><pre class="d">{{ h.raw_stderr }}</pre></div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          </div>
+          </div>
+
+          <script>
+          function showVM(i){document.querySelectorAll('.vi').forEach(function(e){e.classList.remove('on')});document.querySelectorAll('.pn').forEach(function(e){e.classList.remove('on')});document.getElementById('n'+i).classList.add('on');document.getElementById('v'+i).classList.add('on');document.getElementById('mn').scrollTop=0}
+          __SCRIPT_END__
+          </body>
+          </html>
+`.replace('__SCRIPT_END__', '<' + '/script>');
+
+const DEFAULT_POSTCONVERSION_YAML = String.raw`---
+# =============================================================================
+# Post-NVMe Conversion Verification Playbook
+# Collects IMDS VM SKU metadata and lsblk output from all hosts
+# to verify NVMe conversion was successful.
+# Output: /var/www/html/results.json + /var/www/html/index.html
+# =============================================================================
+
+- name: Post-NVMe Conversion Verification
+  hosts: VMs
+  become: true
+  gather_facts: false
+  any_errors_fatal: false
+
+  tasks:
+
+    - name: Query IMDS for VM SKU metadata
+      ansible.builtin.uri:
+        url: "http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01"
+        method: GET
+        headers:
+          Metadata: "true"
+        return_content: true
+        timeout: 10
+      register: imds_raw
+
+    - name: Parse IMDS compute fields
+      ansible.builtin.set_fact:
+        imds:
+          vmSize: "{{ (imds_raw.content | from_json).vmSize | default('unknown') }}"
+          publisher: "{{ (imds_raw.content | from_json).storageProfile.imageReference.publisher | default('unknown') }}"
+          offer: "{{ (imds_raw.content | from_json).storageProfile.imageReference.offer | default('unknown') }}"
+          sku: "{{ (imds_raw.content | from_json).storageProfile.imageReference.sku | default('unknown') }}"
+          version: "{{ (imds_raw.content | from_json).storageProfile.imageReference.version | default('unknown') }}"
+          osType: "{{ (imds_raw.content | from_json).osType | default('unknown') }}"
+          name: "{{ (imds_raw.content | from_json).name | default('unknown') }}"
+          zone: "{{ (imds_raw.content | from_json).zone | default('') }}"
+
+    - name: Collect lsblk output
+      ansible.builtin.command: lsblk -o NAME,TYPE,SIZE,TRAN,MOUNTPOINT
+      register: lsblk_out
+      changed_when: false
+
+    - name: Determine NVMe presence
+      ansible.builtin.set_fact:
+        postconv_result:
+          hostname: "{{ inventory_hostname }}"
+          vm_name: "{{ imds.name }}"
+          vm_size: "{{ imds.vmSize }}"
+          image: "{{ imds.publisher }}:{{ imds.offer }}:{{ imds.sku }}:{{ imds.version }}"
+          os_type: "{{ imds.osType }}"
+          zone: "{{ imds.zone | default('') }}"
+          lsblk: "{{ lsblk_out.stdout }}"
+          has_nvme: "{{ 'nvme' in lsblk_out.stdout | lower }}"
+
+    - name: Show results per host
+      ansible.builtin.debug:
+        msg: |
+          VM: {{ imds.name }} | SKU: {{ imds.vmSize }} | NVMe: {{ postconv_result.has_nvme }}
+          {{ lsblk_out.stdout }}
+
+# =============================================================================
+# Second play: aggregate results into JSON + HTML on localhost
+# =============================================================================
+- name: Generate post-conversion report
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Find hosts with collected data
+      set_fact:
+        _collected: "{{ _collected | default([]) + [item] }}"
+      loop: "{{ groups['VMs'] | default(groups['all']) }}"
+      when: hostvars[item].postconv_result is defined
+      no_log: true
+
+    - name: Build combined report
+      set_fact:
+        combined_report:
+          _meta:
+            description: "Post-NVMe Conversion Verification - {{ _collected | default([]) | length }} hosts"
+            total_hosts: "{{ _collected | default([]) | length }}"
+            generated_at: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+          summary:
+            total: "{{ _collected | default([]) | length }}"
+            nvme_ok: "{{ _collected | default([]) | map('extract', hostvars, 'postconv_result') | selectattr('has_nvme') | list | length }}"
+            nvme_missing: "{{ _collected | default([]) | map('extract', hostvars, 'postconv_result') | rejectattr('has_nvme') | list | length }}"
+          hosts: "{{ dict(_collected | default([]) | zip(_collected | default([]) | map('extract', hostvars, 'postconv_result'))) }}"
+
+    - name: Ensure /var/www/html directory exists
+      file:
+        path: /var/www/html
+        state: directory
+
+    - name: Write /var/www/html/results.json
+      copy:
+        dest: /var/www/html/results.json
+        content: "{{ combined_report | to_nice_json }}"
+
+    - name: Generate post-conversion HTML report
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Post-NVMe Conversion Verification</title>
+          <style>
+          :root{--b:#edebe9;--t:#201f1e;--m:#605e5c;--p:#0078d4;--hb:#0078d4;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;--sans:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+          *{box-sizing:border-box}
+          body{margin:0;font:14px var(--sans);color:var(--t);background:#fff;-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh}
+          .hd{background:var(--hb);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+          .hd h1{margin:0;font-size:16px;font-weight:800}
+          .hd .sp{flex:1}
+          .gb{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:8px;padding:3px 6px;font-size:10px;font-weight:700;cursor:pointer;text-decoration:none}
+          .gb:hover{background:rgba(255,255,255,.22)}
+          .gb svg{width:14px;height:14px;fill:currentColor}
+          .app{display:flex;height:calc(100vh - 42px)}
+          .sb{width:300px;min-width:240px;border-right:1px solid var(--b);overflow-y:auto;background:#fafafa;flex-shrink:0}
+          .vi{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--b);font-size:12px;display:flex;flex-direction:column;gap:2px}
+          .vi:hover{background:#e8f0f8}
+          .vi.on{background:var(--p);color:#fff}
+          .vi.on .vm{color:rgba(255,255,255,.75)}
+          .vn{font-weight:700;font-size:12px}
+          .vm{color:var(--m);font-size:11px}
+          .vp{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}
+          .mn{flex:1;overflow-y:auto;padding:16px}
+          .pn{display:none}
+          .pn.on{display:block}
+          .pt{font-size:16px;font-weight:800;margin:0 0 4px}
+          .ps{font-size:13px;color:var(--m);margin:0 0 12px}
+          .sc{background:#fff;border:1px solid var(--b);border-radius:10px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-top:12px}
+          .sc:first-child{margin-top:0}
+          .sc h4{font-size:13px;font-weight:900;margin:0 0 6px;color:var(--p);border-bottom:1px solid var(--b);padding-bottom:4px}
+          .kv{display:grid;grid-template-columns:150px 1fr;gap:1px 10px;font-size:12px;margin:4px 0}
+          .kv .k{font-weight:700;color:var(--m)}.kv .v{word-break:break-all}
+          pre.d{background:#f8f8f8;border:1px solid var(--b);border-radius:6px;padding:6px;font:11px/1.35 var(--mono);overflow-x:auto;max-height:400px;white-space:pre-wrap;margin:4px 0}
+          .pl{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:900;white-space:nowrap}
+          .pe{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+          .po{background:#ecfdf3;color:#155724;border:1px solid #b7e3c4}
+          .sum{margin:12px 0;padding:12px;background:#faf9f8;border:1px solid var(--b);border-radius:10px;font-size:13px}
+          .sum b{font-size:18px}
+          </style>
+          </head>
+          <body>
+          <div class="hd">
+            <h1>Post-NVMe Conversion Verification</h1>
+            <span class="sp"></span>
+            <a class="gb" href="results.json" download><svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-5 1h10v1H3v-1z"/></svg> JSON</a>
+          </div>
+
+          {# ── Summary ── #}
+          {% set all_rows = [] %}
+          {% set total = combined_report.hosts | length %}
+          {% set nvme_ok = combined_report.hosts.values() | selectattr('has_nvme') | list | length %}
+          {% set nvme_missing = total - nvme_ok %}
+
+          <div class="app">
+          <div class="sb" id="sb">
+          <div class="sum">
+            <b>{{ total }}</b> hosts verified<br>
+            <span class="pl po">{{ nvme_ok }} NVMe OK</span>
+            {% if nvme_missing > 0 %}<span class="pl pe">{{ nvme_missing }} Missing NVMe</span>{% endif %}
+          </div>
+          {% for sku, h in combined_report.hosts.items() | sort %}
+            {% set _ = all_rows.append({'sku': sku, 'h': h, 'idx': loop.index0}) %}
+            <div class="vi{% if loop.first %} on{% endif %}" onclick="showVM({{ loop.index0 }})" id="n{{ loop.index0 }}">
+              <span class="vn">{{ h.hostname | default(sku) }}</span>
+              <span class="vm">{{ h.vm_size | default('') }} &mdash; {{ h.image | default('') }}</span>
+              <span class="vp">
+                {% if h.has_nvme %}<span class="pl po">NVMe OK</span>{% else %}<span class="pl pe">No NVMe</span>{% endif %}
+              </span>
+            </div>
+          {% endfor %}
+          </div>
+
+          <div class="mn" id="mn">
+          {% for r in all_rows %}
+          {% set h = r.h %}
+          <div class="pn{% if loop.first %} on{% endif %}" id="v{{ r.idx }}">
+            <div class="pt">{{ h.hostname | default(r.sku) }}</div>
+            <div class="ps">{{ h.vm_size | default('') }} &mdash; {{ h.image | default('') }}{% if h.zone | default('') %} &mdash; Zone {{ h.zone }}{% endif %}</div>
+
+            <div class="sc"><h4>VM Info</h4>
+            <div class="kv">
+            <div class="k">VM Name</div><div class="v">{{ h.vm_name | default('') }}</div>
+            <div class="k">VM Size</div><div class="v">{{ h.vm_size | default('') }}</div>
+            <div class="k">Image</div><div class="v">{{ h.image | default('') }}</div>
+            <div class="k">OS Type</div><div class="v">{{ h.os_type | default('') }}</div>
+            <div class="k">Zone</div><div class="v">{{ h.zone | default('none') }}</div>
+            <div class="k">NVMe Detected</div><div class="v">{% if h.has_nvme %}<span class="pl po">Yes</span>{% else %}<span class="pl pe">No</span>{% endif %}</div>
+            </div></div>
+
+            <div class="sc"><h4>Block Devices (lsblk)</h4>
+            <pre class="d">{{ h.lsblk | default('') }}</pre>
+            </div>
+          </div>
+          {% endfor %}
+          </div>
+          </div>
+
+          <script>
+          function showVM(i){document.querySelectorAll('.vi').forEach(function(e){e.classList.remove('on')});document.querySelectorAll('.pn').forEach(function(e){e.classList.remove('on')});document.getElementById('n'+i).classList.add('on');document.getElementById('v'+i).classList.add('on');document.getElementById('mn').scrollTop=0}
+          __SCRIPT_END__
+          </body>
+          </html>
+
+    - name: Report summary
+      debug:
+        msg: >-
+          Post-conversion report: {{ combined_report.summary.nvme_ok }}/{{ combined_report.summary.total }} VMs on NVMe.
+          {{ combined_report.summary.nvme_missing }} missing. Results at /var/www/html/
+`.replace('__SCRIPT_END__', '<' + '/script>');
+const POSTCONVERSION_YAML = DEFAULT_POSTCONVERSION_YAML;
+
+const STORAGE_KEY = 'scsi2nvmeUiState';
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      sshKey: $('sshKey').value || '',
+      testYaml: $('testYaml').value || '',
+      filterArch: $('filterArch').value || '',
+      filterGen: $('filterGen').value || '',
+      filterController: $('filterController').value || '',
+      filterPublisher: $('filterPublisher').value || '',
+      regionalVcpuLimit: $('regionalVcpuLimit').value || '',
+      forcedVmSize: $('forcedVmSize').value || '',
+      forcedImageKey: getSelectedForcedImageKeys()
+    }));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      $('testYaml').value = DEFAULT_TEST_YAML;
+      $('filterArch').value = 'x64';
+      $('filterGen').value = 'Gen2';
+      $('filterController').value = 'scsi-only';
+      return;
+    }
+    const s = JSON.parse(raw);
+    if (s.sshKey) $('sshKey').value = s.sshKey;
+    $('testYaml').value = s.testYaml || DEFAULT_TEST_YAML;
+    if (s.filterArch) $('filterArch').value = s.filterArch;
+    if (s.filterGen) $('filterGen').value = s.filterGen;
+    if (s.filterController) $('filterController').value = s.filterController;
+    if (s.filterPublisher) $('filterPublisher').value = s.filterPublisher;
+    if (s.regionalVcpuLimit) $('regionalVcpuLimit').value = s.regionalVcpuLimit;
+    if (s.forcedVmSize) $('forcedVmSize').value = s.forcedVmSize;
+    if (Array.isArray(s.forcedImageKey)) {
+      _forcedImageKeys = new Set(s.forcedImageKey);
+    }
+    refreshForcedImageButton();
+
+  } catch(e) {
+    $('testYaml').value = DEFAULT_TEST_YAML;
+  }
+}
+
+function renderVmTable() {
+  const regional = buildRegionalPlans();
+  const regionByVm = {};
+  regional.regionPlans.forEach(rp => rp.vmList.forEach(vm => { regionByVm[vm.name] = rp.region; }));
+  const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const td = (v) => { const t = String(v ?? '-'); return `<td><span class="truncate-cell" title="${esc(t)}">${esc(t)}</span></td>`; };
+  const rows = regional.basePlan.vmList.map(vm => {
+    const vmRegion = regionByVm[vm.name] || 'region1';
+    return `<tr>${td(vm.name)}${td(urnLabel(vm.image))}${td(vm.arch)}${td(vm.gen)}${td(vm.size)}${td(vm.controller)}${td(vmRegion)}</tr>`;
+  }).join('');
+  $('vmTable').innerHTML = `<table class="summary"><thead><tr><th>VM Name</th><th>Image URN</th><th>Arch</th><th>Gen</th><th>Size</th><th>Ctrl</th><th>Region</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+  // Update count with size distribution
+  const sizeCounts = {};
+  regional.basePlan.vmList.forEach(vm => {
+    sizeCounts[vm.size] = (sizeCounts[vm.size] || 0) + 1;
+  });
+  const sizeDesc = Object.entries(sizeCounts).length
+    ? Object.entries(sizeCounts).map(([k,v]) => `${k}: ${v}`).join(', ')
+    : 'none selected';
+  const totalCores = projectedCoreUsage({ vmList: regional.basePlan.vmList });
+  const strategyNote = regional.basePlan.strategyUsed === 'balanced'
+    ? 'selection: balanced'
+    : (regional.basePlan.strategyUsed === 'smallest'
+      ? 'selection: auto-switched to smallest sizes (quota fit)'
+      : 'selection: smallest sizes + VM cap (quota fit)');
+  const perRegionDesc = regional.regionPlans.map(rp => `${rp.region}: ${rp.vmList.length} VMs / ${rp.cores} cores`).join(' | ');
+  const skippedByFilter = regional.basePlan.images.length - regional.basePlan.vmList.length;
+  const skippedLabel = skippedByFilter > 0 ? ` (skipped ${skippedByFilter} due to active filters)` : '';
+  $('vmCount').textContent = `Image VMs: ${regional.basePlan.vmList.length}${skippedLabel} — ${sizeDesc} | Total cores: ${totalCores} across ${regional.regionPlans.length} region(s)`;
+  $('vmCount').textContent += ` | ${perRegionDesc}`;
+
+  const quotaLimit = getQuotaLimit();
+  $('quotaStatus').textContent = `Per-region vCPU limit: ${quotaLimit}. ${regional.needsSplit ? `Deployment uses ${regional.regionPlans.length} regions with VNet peering.` : 'Single-region deployment.'}`;
+  $('quotaAlert').textContent = regional.needsSplit
+    ? `Multi-region: deploy as subscription-scope template. ${regional.regionPlans.length} resource groups will be created with hub-spoke VNet peering.`
+    : '';
+
+  return regional;
+}
+
+function renderRegionTabs(regionPlans) {
+  const regionDesc = regionPlans.map(rp => `${rp.region} (${rp.vmList.length} VMs)`).join(', ');
+  $('regionTabMeta').textContent = regionPlans.length > 1
+    ? `Subscription-scope template: ${regionDesc}. VNet peering enabled.`
+    : `Single-region deployment (within vCPU limit)`;
+}
+
+function renderSplitWarning(regional) {
+  if (!regional.needsSplit) {
+    $('splitWarning').textContent = '';
+    return;
+  }
+  $('splitWarning').textContent = `Multi-region deployment: ${regional.regionPlans.length} regions with hub-spoke VNet peering. Deploy as subscription-scope template (select a subscription, not a resource group).`;
+}
+
+async function update() {
+  const sshKey = String($('sshKey').value || '').trim();
+  const testYaml = String($('testYaml').value || '');
+  const sshErr = validateSshKey(sshKey);
+  $('sshKeyError').textContent = sshErr;
+  $('genFilterError').textContent = '';
+
+  const valid = !sshErr;
+  $('copyBtn').disabled = !valid;
+  $('deployPortalBtn').disabled = !valid;
+  $('downloadBtn').disabled = !valid;
+
+  if (!valid) {
+    $('output').value = sshErr ? 'Enter a valid SSH public key to generate the ARM template.' : '';
+    return;
+  }
+
+  const regional = renderVmTable();
+  const arm = await generateTemplate(sshKey, testYaml, regional.regionPlans);
+  $('output').value = JSON.stringify(arm, null, 2);
+  renderRegionTabs(regional.regionPlans);
+  renderSplitWarning(regional);
+}
+
+$('sshKey').oninput = () => { saveState(); update(); };
+$('testYaml').oninput = () => { saveState(); update(); };
+
+const FILTER_IDS = ['filterArch','filterGen','filterController','filterPublisher'];
+FILTER_IDS.forEach(id => {
+  $(id).onchange = () => { pruneForcedImageKeys(); refreshForcedVmSizeDropdown(); refreshForcedImageButton(); saveState(); update(); };
+});
+
+$('regionalVcpuLimit').oninput = () => { saveState(); update(); };
+$('forcedVmSize').onchange = () => { refreshForcedImageButton(); saveState(); update(); };
+
+$('openImagePickerBtn').onclick = () => { openImagePicker(); };
+$('imagePickerDone').onclick = () => { closeImagePicker(); };
+$('imagePickerOverlay').onclick = (e) => { if (e.target === $('imagePickerOverlay')) closeImagePicker(); };
+$('helpBtn').onclick = (e) => {
+  e.stopPropagation();
+  const balloon = $('helpBalloon');
+  if (!balloon) return;
+  const nextShow = !balloon.classList.contains('show');
+  balloon.classList.toggle('show', nextShow);
+  balloon.setAttribute('aria-hidden', nextShow ? 'false' : 'true');
+};
+
+document.addEventListener('click', (e) => {
+  const balloon = $('helpBalloon');
+  const wrap = document.querySelector('.help-wrap');
+  if (!balloon || !wrap) return;
+  if (!wrap.contains(e.target)) {
+    balloon.classList.remove('show');
+    balloon.setAttribute('aria-hidden', 'true');
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const balloon = $('helpBalloon');
+    if (balloon) { balloon.classList.remove('show'); balloon.setAttribute('aria-hidden', 'true'); }
+    if ($('imagePickerOverlay').classList.contains('show')) { closeImagePicker(); return; }
+    if ($('summaryFlowWindow').classList.contains('show')) { closeSummaryFlow(); return; }
+    if ($('yamlFlowWindow').classList.contains('show')) { closeYamlFlow(); return; }
+    if ($('jsonFlowWindow').classList.contains('show')) { closeJsonFlow(); return; }
+  }
+  if (e.key === 'Enter' && $('imagePickerOverlay').classList.contains('show')) {
+    e.preventDefault(); closeImagePicker();
+  }
+});
+$('imagePickerSelectAll').onclick = () => {
+  const cbs = $('imagePickerBody').querySelectorAll('input[type="checkbox"]');
+  cbs.forEach(cb => { cb.checked = true; _forcedImageKeys.add(cb.value); });
+  updateImagePickerCount();
+};
+$('imagePickerClearAll').onclick = () => {
+  const cbs = $('imagePickerBody').querySelectorAll('input[type="checkbox"]');
+  cbs.forEach(cb => { cb.checked = false; });
+  _forcedImageKeys.clear();
+  updateImagePickerCount();
+};
+
+// YAML flow window
+function openYamlFlow() {
+  $('yamlFlowOutput').value = $('testYaml').value;
+  $('yamlFlowWindow').classList.add('show');
+  $('yamlFlowOutput').focus();
+}
+function closeYamlFlow() {
+  $('testYaml').value = $('yamlFlowOutput').value;
+  $('yamlFlowWindow').classList.remove('show');
+  saveState(); update();
+}
+$('expandYamlBtn').onclick = () => { openYamlFlow(); };
+$('yamlFlowCloseBtn').onclick = () => { closeYamlFlow(); };
+$('yamlFlowCopyBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText($('yamlFlowOutput').value); } catch(e) { alert('Copy failed.'); }
+};
+
+// JSON flow window
+function openJsonFlow() {
+  $('jsonFlowOutput').value = $('output').value;
+  $('jsonFlowWindow').classList.add('show');
+}
+function closeJsonFlow() {
+  $('jsonFlowWindow').classList.remove('show');
+}
+$('expandJsonBtn').onclick = () => { openJsonFlow(); };
+$('jsonFlowCloseBtn').onclick = () => { closeJsonFlow(); };
+$('jsonFlowCopyBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText($('jsonFlowOutput').value); } catch(e) { alert('Copy failed.'); }
+};
+
+// Summary flow window
+function openSummaryFlow() {
+  $('summaryFlowCount').innerHTML = $('vmCount').textContent;
+  $('summaryFlowTable').innerHTML = $('vmTable').innerHTML;
+  $('summaryFlowWindow').classList.add('show');
+}
+function closeSummaryFlow() {
+  $('summaryFlowWindow').classList.remove('show');
+}
+$('expandSummaryBtn').onclick = () => { openSummaryFlow(); };
+$('summaryFlowCloseBtn').onclick = () => { closeSummaryFlow(); };
+
+$('clearFiltersBtn').onclick = () => {
+  FILTER_IDS.forEach(id => { $(id).value = ''; });
+  refreshForcedVmSizeDropdown();
+  refreshForcedImageButton();
+  saveState();
+  update();
+};
+
+$('copyBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText($('output').value); $('copyBtn').textContent = 'Copied!'; setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 900); }
+  catch(e) { alert('Copy failed.'); }
+};
+
+$('deployPortalBtn').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($('output').value);
+    const btn = $('deployPortalBtn');
+    btn.disabled = true;
+    btn.textContent = 'Opening in 5s...';
+    setTimeout(() => {
+      window.open('https://portal.azure.com/#create/Microsoft.Template', '_blank', 'noopener');
+      btn.textContent = 'Copy + Portal';
+      btn.disabled = false;
+    }, 5000);
+  } catch(e) { alert('Copy failed.'); }
+};
+
+$('downloadBtn').onclick = () => {
+  const blob = new Blob([$('output').value], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'scsi2nvme-deploy.json';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+};
+
+// Populate publisher filter from imageOptions catalog
+(function populatePublisherFilter() {
+  const sel = $('filterPublisher');
+  if (!sel) return;
+  const publishers = [...new Set(imageOptions.map(img => img.ref && img.ref.publisher).filter(Boolean))];
+  publishers.sort((a, b) => a.localeCompare(b));
+  publishers.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p;
+    o.textContent = p;
+    sel.appendChild(o);
+  });
+})();
+
+// Populate forced VM size dropdown from sizeOptions catalog
+(function populateForcedVmSizeDropdown() {
+  const sel = $('forcedVmSize');
+  if (!sel) return;
+  sizeOptions.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.name;
+    o.textContent = `${s.name} (${(s.tags && s.tags.vcpus) || '?'} vCPUs, ${((s.tags && s.tags.architectures) || [])[0] || '?'})`;
+    sel.appendChild(o);
+  });
+})();
+
+function refreshForcedVmSizeDropdown() {
+  const sel = $('forcedVmSize');
+  if (!sel) return;
+  const prev = sel.value;
+  // Use forced images if any, otherwise use filtered images
+  const relevantImages = _forcedImageKeys.size
+    ? imageOptions.filter(i => _forcedImageKeys.has(i.key))
+    : getFilteredImages();
+  const compatibleSizeNames = new Set();
+  relevantImages.forEach(img => {
+    compatibleSizesForImage(img).forEach(si => compatibleSizeNames.add(si.name));
+  });
+  Array.from(sel.options).forEach(o => {
+    if (!o.value) return;
+    o.style.display = compatibleSizeNames.has(o.value) ? '' : 'none';
+  });
+  if (prev && !compatibleSizeNames.has(prev)) {
+    sel.value = '';
+  }
+}
+
+$('resetStateBtn').onclick = () => {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  const panel = document.createElement('div');
+  panel.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 16px 40px rgba(0,0,0,0.22);max-width:360px;text-align:center;';
+  panel.innerHTML = '<div style="font-weight:900;font-size:15px;margin-bottom:8px;">Reset all state?</div><div style="color:var(--muted);font-size:13px;margin-bottom:16px;">This clears all saved configuration, filters, and options. The page will reload with defaults.</div>';
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => { overlay.remove(); document.removeEventListener('keydown', keyHandler); };
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'danger';
+  confirmBtn.textContent = 'Reset';
+  confirmBtn.onclick = () => { localStorage.removeItem(STORAGE_KEY); _forcedImageKeys.clear(); location.reload(); };
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(confirmBtn);
+  panel.appendChild(btnRow);
+  overlay.appendChild(panel);
+  overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); document.removeEventListener('keydown', keyHandler); } };
+  const keyHandler = (e) => {
+    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', keyHandler); }
+    if (e.key === 'Enter') { e.preventDefault(); localStorage.removeItem(STORAGE_KEY); _forcedImageKeys.clear(); location.reload(); }
+  };
+  document.addEventListener('keydown', keyHandler);
+  document.body.appendChild(overlay);
+  confirmBtn.focus();
+};
+
+loadState();
+update();
+</script>
+</body>
+</html>

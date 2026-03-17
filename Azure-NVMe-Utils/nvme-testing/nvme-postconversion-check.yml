@@ -1,0 +1,130 @@
+---
+# Post-Conversion Verification Playbook
+# Collects IMDS VM SKU metadata and lsblk output from all hosts
+# to verify NVMe conversion was successful.
+#
+# Usage:
+#   ansible-playbook -i inventory.ini nvme-postconversion-check.yml
+#
+# Output:
+#   ./postconversion-report.json  (on the Ansible controller)
+
+- name: Post-NVMe Conversion Verification
+  hosts: all
+  become: true
+  gather_facts: false
+  any_errors_fatal: false
+
+  vars:
+    local_report_file: "{{ playbook_dir }}/postconversion-report.json"
+
+  tasks:
+
+    - name: Query IMDS for VM SKU metadata
+      ansible.builtin.uri:
+        url: "http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01"
+        method: GET
+        headers:
+          Metadata: "true"
+        return_content: true
+        timeout: 10
+      register: imds_raw
+
+    - name: Parse IMDS compute fields
+      ansible.builtin.set_fact:
+        imds:
+          vmSize: "{{ (imds_raw.content | from_json).vmSize | default('unknown') }}"
+          publisher: "{{ (imds_raw.content | from_json).storageProfile.imageReference.publisher | default('unknown') }}"
+          offer: "{{ (imds_raw.content | from_json).storageProfile.imageReference.offer | default('unknown') }}"
+          sku: "{{ (imds_raw.content | from_json).storageProfile.imageReference.sku | default('unknown') }}"
+          version: "{{ (imds_raw.content | from_json).storageProfile.imageReference.version | default('unknown') }}"
+          osType: "{{ (imds_raw.content | from_json).osType | default('unknown') }}"
+          name: "{{ (imds_raw.content | from_json).name | default('unknown') }}"
+          zone: "{{ (imds_raw.content | from_json).zone | default('') }}"
+
+    - name: Collect lsblk output
+      ansible.builtin.command: lsblk -o NAME,TYPE,SIZE,TRAN,MOUNTPOINT
+      register: lsblk_out
+      changed_when: false
+
+    - name: Show results per host
+      ansible.builtin.debug:
+        msg: |
+          VM: {{ imds.name }}
+          SKU: {{ imds.vmSize }}
+          Image: {{ imds.publisher }}:{{ imds.offer }}:{{ imds.sku }}:{{ imds.version }}
+          OS: {{ imds.osType }}
+          Zone: {{ imds.zone | default('none', true) }}
+          ---
+          {{ lsblk_out.stdout }}
+
+  # ── Aggregate results into a single JSON report on the controller ──
+
+    - name: Create temp results directory on controller
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/.postconversion-tmp"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Save per-host result to controller
+      ansible.builtin.copy:
+        content: >-
+          {{ _host_result | to_nice_json }}
+        dest: "{{ playbook_dir }}/.postconversion-tmp/{{ inventory_hostname }}.json"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+      vars:
+        _host_result:
+          hostname: "{{ inventory_hostname }}"
+          vm_name: "{{ imds.name }}"
+          vm_size: "{{ imds.vmSize }}"
+          image: "{{ imds.publisher }}:{{ imds.offer }}:{{ imds.sku }}:{{ imds.version }}"
+          os_type: "{{ imds.osType }}"
+          zone: "{{ imds.zone | default('') }}"
+          lsblk: "{{ lsblk_out.stdout }}"
+          has_nvme: "{{ 'nvme' in lsblk_out.stdout | lower }}"
+
+    - name: Assemble final JSON report on controller
+      ansible.builtin.shell:
+        cmd: |
+          python3 << 'PYEOF'
+          import json, glob, os, datetime
+          results = {}
+          for f in sorted(glob.glob(os.path.join('{{ playbook_dir }}', '.postconversion-tmp', '*.json'))):
+              with open(f) as fh:
+                  data = json.load(fh)
+              results[data['hostname']] = data
+          report = {
+              '_meta': {
+                  'description': 'Post-NVMe Conversion Verification',
+                  'generated_at': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                  'total_hosts': str(len(results))
+              },
+              'hosts': results
+          }
+          with open('{{ local_report_file }}', 'w') as fp:
+              json.dump(report, fp, indent=2)
+          print(json.dumps({'hosts': len(results), 'nvme_count': sum(1 for h in results.values() if h.get('has_nvme') == 'True')}))
+          PYEOF
+      delegate_to: localhost
+      become: false
+      run_once: true
+      register: assemble_out
+      changed_when: false
+
+    - name: Show report summary
+      ansible.builtin.debug:
+        msg: "Report written to {{ local_report_file }} — {{ assemble_out.stdout }}"
+      run_once: true
+
+    - name: Clean up temp directory
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/.postconversion-tmp"
+        state: absent
+      delegate_to: localhost
+      become: false
+      run_once: true

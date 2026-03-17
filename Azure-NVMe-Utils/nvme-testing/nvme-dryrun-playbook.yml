@@ -1,0 +1,537 @@
+---
+# NVMe Conversion Dry-Run Playbook
+# Runs the NVMe readiness check in dry-run mode on all inventory hosts
+# and collects results into a single JSON report for analysis.
+#
+# Usage:
+#   ansible-playbook -i inventory.ini nvme-dryrun-playbook.yml
+#
+# Output:
+#   ./nvme-dryrun-report.json  (on the Ansible controller)
+
+- name: NVMe Conversion Dry-Run Assessment
+  hosts: all
+  become: true
+  gather_facts: true
+  any_errors_fatal: false
+
+  vars:
+    staging_dir: /tmp/nvme-conversion-dryrun
+    local_report_file: "{{ playbook_dir }}/nvme-dryrun-report.json"
+
+  tasks:
+
+    # ── 1. Run the dry-run check script inline ─────────────────────
+    - name: Execute NVMe dry-run check
+      ansible.builtin.shell:
+        cmd: |
+          #!/bin/bash
+          # NVMe Conversion Dry-Run Check Script
+          # Runs in dry-run + fix mode: stages all proposed changes without modifying the system
+          fix=true
+          dry_run=true
+          distro=""
+          staging_dir=""
+
+          setup_dryrun() {
+              staging_dir="/tmp/nvme-conversion-dryrun"
+              rm -rf "$staging_dir"
+              mkdir -p "$staging_dir/original" "$staging_dir/modified" "$staging_dir/diffs"
+              echo "$(hostname)" > "$staging_dir/hostname"
+              echo "$distro" > "$staging_dir/distro"
+              uname -r > "$staging_dir/kernel"
+              echo "[INFO] Dry-run mode: staging changes in $staging_dir"
+          }
+
+          if [ -f /etc/os-release ]; then
+              source /etc/os-release
+              distro="$ID"
+          elif [ -f /etc/debian_version ]; then distro="debian"
+          elif [ -f /etc/SuSE-release ]; then distro="suse"
+          elif [ -f /etc/redhat-release ]; then distro="redhat"
+          elif [ -f /etc/centos-release ]; then distro="centos"
+          elif [ -f /etc/rocky-release ]; then distro="rocky"
+          else echo "[ERROR] Unsupported distribution."; exit 1; fi
+          echo "[INFO] Operating system detected: $distro"
+
+          setup_dryrun
+
+          check_nvme_driver() {
+              echo "[INFO] Checking if NVMe driver is available for boot..."
+              if grep -qw nvme "/lib/modules/$(uname -r)/modules.builtin" 2>/dev/null; then
+                  echo "[INFO] NVMe driver is built into the kernel. No initramfs entry needed."
+                  echo "[DRYRUN] NVMe driver is built-in (kernel $(uname -r)). No initramfs or dracut changes needed."
+                  echo "nvme_builtin=true" > "$staging_dir/modified/nvme-driver-status.txt"
+                  echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
+                  grep -w nvme "/lib/modules/$(uname -r)/modules.builtin" >> "$staging_dir/modified/nvme-driver-status.txt"
+                  return 0
+              fi
+              echo "[INFO] NVMe is not built-in. Checking initrd/initramfs..."
+              case "$distro" in
+                  ubuntu|debian)
+                      _initramfs_ok=true
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -q nvme; then
+                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
+                          _initramfs_ok=false
+                      fi
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                          echo "[WARNING] pci-hyperv/hv_pci driver not found in initrd/initramfs (required for Azure NVMe)."
+                          _initramfs_ok=false
+                      fi
+                      if $_initramfs_ok; then
+                          echo "[INFO] NVMe driver found in initrd/initramfs."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in initramfs. No changes needed."
+                          echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
+                          echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
+                      else
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk."
+                          echo "[DRYRUN] Would run: update-initramfs -u -k all"
+                          echo "update-initramfs -u -k all" > "$staging_dir/modified/initramfs-commands.txt"
+                      fi
+                      ;;
+                  redhat|rhel|centos|rocky|almalinux|azurelinux|mariner|suse|sles|ol)
+                      # Fix 10: check ALL installed initramfs images, not just the running kernel
+                      _nvme_missing=false
+                      for _img in /boot/initramfs-*.img; do
+                          [ -f "$_img" ] || continue
+                          [[ "$_img" == *kdump* ]] && continue
+                          [[ "$_img" == *rescue* ]] && continue
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -q nvme; then
+                              echo "[WARNING] NVMe driver not found in $_img"
+                              _nvme_missing=true
+                          fi
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                              echo "[WARNING] pci-hyperv/hv_pci driver not found in $_img (required for Azure NVMe)"
+                              _nvme_missing=true
+                          fi
+                      done
+                      if ! $_nvme_missing; then
+                          echo "[INFO] NVMe and pci-hyperv drivers found in initrd/initramfs."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in all initramfs images. No changes needed."
+                          echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
+                          echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
+                      else
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in all initramfs images."
+                          echo "[DRYRUN] Would run: dracut -f --regenerate-all (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
+                          echo 'add_drivers+=" nvme nvme-core pci-hyperv "' > "$staging_dir/modified/dracut-nvme.conf"
+                          echo "dracut -f --regenerate-all" > "$staging_dir/modified/initramfs-commands.txt"
+                      fi
+                      ;;
+                  *) echo "[ERROR] Unsupported distribution for NVMe driver check."; return 1 ;;
+              esac
+          }
+
+          check_nvme_timeout() {
+              echo "[INFO] Checking nvme_core.io_timeout parameter..."
+              # Build grub file list dynamically for verification
+              _grub_check_files="/etc/default/grub"
+              if [ -f /boot/grub2/grub.cfg ]; then
+                  _grub_check_files="$_grub_check_files /boot/grub2/grub.cfg"
+              elif [ -f /boot/grub/grub.cfg ]; then
+                  _grub_check_files="$_grub_check_files /boot/grub/grub.cfg"
+              fi
+              if grep -q "nvme_core.io_timeout=240" $_grub_check_files 2>/dev/null; then
+                  echo "[INFO] nvme_core.io_timeout is set to 240."
+                  echo "[DRYRUN] nvme_core.io_timeout already set to 240. No grub changes needed."
+                  echo "nvme_core_io_timeout=240" > "$staging_dir/modified/nvme-timeout-status.txt"
+                  echo "status=already_configured" >> "$staging_dir/modified/nvme-timeout-status.txt"
+              elif command -v grubby &>/dev/null && grubby --info=ALL 2>/dev/null | grep -q "nvme_core.io_timeout=240"; then
+                  echo "[INFO] nvme_core.io_timeout is set to 240 (BLS entries)."
+              else
+                  echo "[WARNING] nvme_core.io_timeout is not set to 240."
+                  echo "[DRYRUN] Staging grub changes..."
+                  local grub_file=""
+                  [ -f /etc/default/grub ] && grub_file="/etc/default/grub"
+                  if [ -n "$grub_file" ]; then
+                      cp "$grub_file" "$staging_dir/original/grub"
+                      cp "$grub_file" "$staging_dir/modified/grub"
+                      case "$distro" in
+                          ubuntu|debian) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          suse|sles|opensuse*) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          ol) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          *) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                      esac
+                      diff -u "$staging_dir/original/grub" "$staging_dir/modified/grub" > "$staging_dir/diffs/grub.diff" 2>&1 || true
+                      echo "[DRYRUN] Grub diff staged in $staging_dir/diffs/grub.diff"
+                      cat "$staging_dir/diffs/grub.diff"
+                      # Check for BLS (BootLoaderSpec) — RHEL 8+, AlmaLinux 8+, OL 8.10+
+                      if grep -q "GRUB_ENABLE_BLSCFG=true" "$grub_file" 2>/dev/null; then
+                          echo "[INFO] BLS (BootLoaderSpec) is enabled."
+                          if command -v grubby &>/dev/null; then
+                              echo "[DRYRUN] Would run: grubby --update-kernel=ALL --args=nvme_core.io_timeout=240"
+                              echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                              echo "grubby_available=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                          else
+                              echo "[WARNING] BLS is enabled but grubby is not installed."
+                              echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                              echo "grubby_available=false" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                          fi
+                      fi
+                  else
+                      echo "[DRYRUN] No grub config found to stage."
+                  fi
+              fi
+          }
+
+          check_fstab() {
+              echo "[INFO] Checking /etc/fstab for deprecated device names..."
+              # NOTE: /dev/mapper/* (LVM) and PARTUUID= paths survive NVMe conversion
+              # because they use UUID-based addressing underneath. Only /dev/sd* and
+              # /dev/disk/azure/scsi* paths break when disks move from SCSI to NVMe.
+              if grep -Eq '/dev/sd[a-z][0-9]*|/dev/disk/azure/scsi[0-9]*/lun[0-9]*' /etc/fstab; then
+                  echo "[WARNING] /etc/fstab contains deprecated device names."
+                  echo "[DRYRUN] Staging fstab changes..."
+                  cp /etc/fstab "$staging_dir/original/fstab"
+                  while read -r line; do
+                      if [[ "$line" =~ ^[^#] ]]; then
+                          device=$(echo "$line" | awk '{print $1}')
+                          if [[ "$device" =~ ^/dev/sd[a-z][0-9]*$ ]] || [[ "$device" =~ ^/dev/disk/azure/scsi[0-9]*/lun[0-9]* ]]; then
+                              uuid=$(blkid "$device" 2>/dev/null | awk -F\" '/UUID=/ {print $2}')
+                              if [ -n "$uuid" ]; then
+                                  newline=$(echo "$line" | sed "s|$device|UUID=$uuid|g")
+                                  echo "[DRYRUN] Would replace $device with UUID=$uuid"
+                                  echo "$newline" >> "$staging_dir/modified/fstab"
+                              else
+                                  echo "[DRYRUN] Could not find UUID for $device. Would skip."
+                                  echo "$line" >> "$staging_dir/modified/fstab"
+                              fi
+                          else
+                              echo "$line" >> "$staging_dir/modified/fstab"
+                          fi
+                      else
+                          echo "$line" >> "$staging_dir/modified/fstab"
+                      fi
+                  done < /etc/fstab
+                  diff -u "$staging_dir/original/fstab" "$staging_dir/modified/fstab" > "$staging_dir/diffs/fstab.diff" 2>&1 || true
+                  echo "[DRYRUN] Fstab diff staged in $staging_dir/diffs/fstab.diff"
+                  cat "$staging_dir/diffs/fstab.diff"
+              else
+                  echo "[INFO] /etc/fstab does not contain deprecated device names."
+              fi
+          }
+
+          check_nvme_driver
+          check_nvme_timeout
+          check_fstab
+
+          echo ""
+          echo "[DRYRUN] ============================================"
+          echo "[DRYRUN] Summary report for $(hostname)"
+          echo "[DRYRUN] Distro: $distro | Kernel: $(uname -r)"
+          echo "[DRYRUN] Staging directory: $staging_dir"
+          echo "[DRYRUN] ============================================"
+          echo "[DRYRUN] Files in staging directory:"
+          find "$staging_dir" -type f | sort | while read -r f; do
+              echo "[DRYRUN]   $f"
+          done
+          echo "[DRYRUN] ============================================"
+          echo "[DRYRUN] No system files were modified."
+          exit 0
+        executable: /bin/bash
+      register: dryrun_output
+      changed_when: false
+      failed_when: false
+
+    # ── 2. Parse script output into structured data ─────────────────
+    - name: Parse script output lines
+      ansible.builtin.set_fact:
+        nvme_result:
+          hostname: "{{ inventory_hostname }}"
+          fqdn: "{{ ansible_fqdn | default(inventory_hostname) }}"
+          ip: "{{ ansible_default_ipv4.address | default('unknown') }}"
+          distro: "{{ ansible_distribution | default('unknown') | lower }}"
+          distro_version: "{{ ansible_distribution_version | default('unknown') }}"
+          kernel: "{{ ansible_kernel | default('unknown') }}"
+          exit_code: "{{ dryrun_output.rc }}"
+          errors: "{{ dryrun_output.stdout_lines | select('search', '\\[ERROR\\]') | list }}"
+          warnings: "{{ dryrun_output.stdout_lines | select('search', '\\[WARNING\\]') | list }}"
+          info: "{{ dryrun_output.stdout_lines | select('search', '\\[INFO\\]') | list }}"
+          dryrun: "{{ dryrun_output.stdout_lines | select('search', '\\[DRYRUN\\]') | list }}"
+          error_count: "{{ dryrun_output.stdout_lines | select('search', '\\[ERROR\\]') | list | length }}"
+          warning_count: "{{ dryrun_output.stdout_lines | select('search', '\\[WARNING\\]') | list | length }}"
+          raw_stdout: "{{ dryrun_output.stdout }}"
+          raw_stderr: "{{ dryrun_output.stderr }}"
+
+    # ── 3. Collect staged files from the dry-run directory ──────────
+    - name: Check if staging directory exists
+      ansible.builtin.stat:
+        path: "{{ staging_dir }}"
+      register: staging_stat
+
+    - name: List staged files
+      ansible.builtin.find:
+        paths: "{{ staging_dir }}"
+        recurse: true
+        file_type: file
+      register: staged_files
+      when: staging_stat.stat.exists
+
+    - name: Read staged file contents
+      ansible.builtin.slurp:
+        src: "{{ item.path }}"
+      register: staged_contents
+      loop: "{{ staged_files.files | default([]) }}"
+      when: staging_stat.stat.exists
+
+    - name: Build staged files map
+      ansible.builtin.set_fact:
+        staged_files_map: >-
+          {{
+            staged_files_map | default({}) | combine({
+              item.item.path | replace(staging_dir + '/', ''): item.content | b64decode
+            })
+          }}
+      loop: "{{ staged_contents.results | default([]) }}"
+      when: staging_stat.stat.exists and item.content is defined
+      no_log: true
+
+    - name: Attach staged files to result
+      ansible.builtin.set_fact:
+        nvme_result: "{{ nvme_result | combine({'staged_files': staged_files_map | default({})}) }}"
+
+    # ── 4. Determine readiness status ───────────────────────────────
+    - name: Set readiness status
+      ansible.builtin.set_fact:
+        nvme_result: >-
+          {{
+            nvme_result | combine({
+              'ready': (nvme_result.error_count | int == 0),
+              'needs_changes': (nvme_result.warning_count | int > 0)
+            })
+          }}
+
+    # ── 5. Cleanup remote artifacts ─────────────────────────────────
+    - name: Remove staging directory from target
+      ansible.builtin.file:
+        path: "{{ staging_dir }}"
+        state: absent
+
+  # ── 6. Aggregate all results into a single JSON file ────────────
+  post_tasks:
+    - name: Debug per-host result
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: ready={{ nvme_result.ready }}
+          errors={{ nvme_result.error_count }}
+          warnings={{ nvme_result.warning_count }}
+      when: nvme_result is defined
+
+- name: Generate consolidated JSON report
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    local_report_file: "{{ playbook_dir }}/nvme-dryrun-report.json"
+
+  tasks:
+    - name: Find hosts with collected data
+      ansible.builtin.set_fact:
+        _collected: "{{ _collected | default([]) + [item] }}"
+      loop: "{{ groups['all'] }}"
+      when: hostvars[item].nvme_result is defined
+      no_log: true
+
+    - name: Build consolidated report
+      ansible.builtin.set_fact:
+        full_report:
+          generated_at: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime }}"
+          total_hosts: "{{ groups['all'] | length }}"
+          collected_hosts: "{{ _collected | default([]) | length }}"
+          unreachable_hosts: "{{ groups['all'] | length - (_collected | default([]) | length) }}"
+          results: >-
+            {{
+              _collected | default([])
+              | map('extract', hostvars, 'nvme_result')
+              | list
+            }}
+
+    - name: Compute summary counts
+      ansible.builtin.set_fact:
+        full_report: >-
+          {{
+            full_report | combine({
+              'summary': {
+                'ready': full_report.results | selectattr('ready') | list | length,
+                'needs_changes': full_report.results | selectattr('needs_changes') | list | length,
+                'errors': full_report.results | rejectattr('error_count', 'equalto', '0') | list | length,
+                'total': full_report.results | length,
+                'unreachable': full_report.unreachable_hosts | int
+              }
+            })
+          }}
+
+    - name: Write JSON report to playbook directory
+      ansible.builtin.copy:
+        content: "{{ full_report | to_nice_json }}"
+        dest: "{{ local_report_file }}"
+        mode: "0644"
+
+    - name: Ensure /var/www/html directory exists
+      ansible.builtin.file:
+        path: /var/www/html
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: Write /var/www/html/results.json
+      ansible.builtin.copy:
+        content: "{{ full_report | to_nice_json }}"
+        dest: /var/www/html/results.json
+        mode: "0644"
+      become: true
+
+    - name: Generate NVMe validation HTML report
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        mode: "0644"
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>SCSI-to-NVMe Conversion Assessment Report</title>
+          <style>
+          :root{--b:#edebe9;--t:#201f1e;--m:#605e5c;--p:#0078d4;--hb:#0078d4;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;--sans:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+          *{box-sizing:border-box}
+          body{margin:0;font:14px var(--sans);color:var(--t);background:#fff;-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh}
+          .hd{background:var(--hb);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+          .hd h1{margin:0;font-size:16px;font-weight:800}
+          .hd .sp{flex:1}
+          .gb{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:8px;padding:3px 6px;font-size:10px;font-weight:700;cursor:pointer;text-decoration:none}
+          .gb:hover{background:rgba(255,255,255,.22)}
+          .gb svg{width:14px;height:14px;fill:currentColor}
+          .app{display:flex;height:calc(100vh - 42px)}
+          .sb{width:300px;min-width:240px;border-right:1px solid var(--b);overflow-y:auto;background:#fafafa;flex-shrink:0}
+          .vi{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--b);font-size:12px;display:flex;flex-direction:column;gap:2px}
+          .vi:hover{background:#e8f0f8}
+          .vi.on{background:var(--p);color:#fff}
+          .vi.on .vm{color:rgba(255,255,255,.75)}
+          .vn{font-weight:700;font-size:12px}
+          .vm{color:var(--m);font-size:11px}
+          .vp{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}
+          .mn{flex:1;overflow-y:auto;padding:16px}
+          .pn{display:none}
+          .pn.on{display:block}
+          .pt{font-size:16px;font-weight:800;margin:0 0 4px}
+          .ps{font-size:13px;color:var(--m);margin:0 0 12px}
+          .sc{background:#fff;border:1px solid var(--b);border-radius:10px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-top:12px}
+          .sc:first-child{margin-top:0}
+          .sc h4{font-size:13px;font-weight:900;margin:0 0 6px;color:var(--p);border-bottom:1px solid var(--b);padding-bottom:4px}
+          .kv{display:grid;grid-template-columns:150px 1fr;gap:1px 10px;font-size:12px;margin:4px 0}
+          .kv .k{font-weight:700;color:var(--m)}.kv .v{word-break:break-all}
+          pre.d{background:#f8f8f8;border:1px solid var(--b);border-radius:6px;padding:6px;font:11px/1.35 var(--mono);overflow-x:auto;max-height:220px;white-space:pre-wrap;margin:4px 0}
+          .pl{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:900;white-space:nowrap}
+          .pe{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+          .pw{background:#fff7e6;color:#856404;border:1px solid #f3d08b}
+          .po{background:#ecfdf3;color:#155724;border:1px solid #b7e3c4}
+          .pi{background:#e8f0f8;color:#004085;border:1px solid #c9d8e6}
+          .sum{margin:12px 0;padding:12px;background:#faf9f8;border:1px solid var(--b);border-radius:10px;font-size:13px}
+          .sum b{font-size:18px}
+          </style>
+          </head>
+          <body>
+          <div class="hd">
+            <h1>SCSI-to-NVMe Conversion Assessment</h1>
+            <span class="sp"></span>
+            <a class="gb" href="results.json" download><svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-5 1h10v1H3v-1z"/></svg> JSON</a>
+          </div>
+
+          {% set all_rows = [] %}
+          {% set total = full_report.results | length %}
+          {% set ready_count = full_report.results | selectattr('ready') | list | length %}
+          {% set changes_count = full_report.results | selectattr('needs_changes') | list | length %}
+          {% set error_count = full_report.results | rejectattr('error_count', 'equalto', '0') | list | length %}
+
+          <div class="app">
+          <div class="sb" id="sb">
+          <div class="sum">
+            <b>{{ total }}</b> hosts scanned<br>
+            <span class="pl po">{{ ready_count }} Ready</span>
+            <span class="pl pw">{{ changes_count }} Need Changes</span>
+            <span class="pl pe">{{ error_count }} Errors</span>
+          </div>
+          {% for h in full_report.results | sort(attribute='hostname') %}
+            {% set _ = all_rows.append({'h': h, 'idx': loop.index0}) %}
+            <div class="vi{% if loop.first %} on{% endif %}" onclick="showVM({{ loop.index0 }})" id="n{{ loop.index0 }}">
+              <span class="vn">{{ h.hostname }}</span>
+              <span class="vm">{{ h.distro | default('') }} {{ h.distro_version | default('') }} &mdash; {{ h.kernel | default('') }}</span>
+              <span class="vp">
+                {% if h.ready %}<span class="pl po">Ready</span>{% endif %}
+                {% if h.needs_changes %}<span class="pl pw">Needs Changes</span>{% endif %}
+                {% if h.error_count | int > 0 %}<span class="pl pe">{{ h.error_count }} Errors</span>{% endif %}
+              </span>
+            </div>
+          {% endfor %}
+          </div>
+
+          <div class="mn" id="mn">
+          {% for r in all_rows %}
+          {% set h = r.h %}
+          <div class="pn{% if loop.first %} on{% endif %}" id="v{{ r.idx }}">
+            <div class="pt">{{ h.hostname }}</div>
+            <div class="ps">{{ h.distro | default('') }} {{ h.distro_version | default('') }} &mdash; Kernel {{ h.kernel | default('') }} &mdash; {{ h.ip | default('') }}</div>
+
+            <div class="sc"><h4>NVMe Readiness</h4>
+            <div class="kv">
+            <div class="k">Ready</div><div class="v">{{ h.ready }}</div>
+            <div class="k">Needs Changes</div><div class="v">{{ h.needs_changes }}</div>
+            <div class="k">Exit Code</div><div class="v">{{ h.exit_code | default('') }}</div>
+            <div class="k">Errors</div><div class="v">{{ h.error_count | default(0) }}</div>
+            <div class="k">Warnings</div><div class="v">{{ h.warning_count | default(0) }}</div>
+            </div></div>
+
+            {% if h.errors | default([]) | length > 0 %}
+            <div class="sc"><h4>Errors</h4><pre class="d">{% for l in h.errors %}{{ l }}
+            {% endfor %}</pre></div>
+            {% endif %}
+
+            {% if h.warnings | default([]) | length > 0 %}
+            <div class="sc"><h4>Warnings</h4><pre class="d">{% for l in h.warnings %}{{ l }}
+            {% endfor %}</pre></div>
+            {% endif %}
+
+            <div class="sc"><h4>Dry-Run Actions</h4><pre class="d">{% for l in h.dryrun | default([]) %}{{ l }}
+            {% endfor %}</pre></div>
+
+            <div class="sc"><h4>Info Messages</h4><pre class="d">{% for l in h.info | default([]) %}{{ l }}
+            {% endfor %}</pre></div>
+
+            {% if h.staged_files is defined and h.staged_files | length > 0 %}
+            <div class="sc"><h4>Staged Files</h4>
+            {% for fname, content in (h.staged_files | default({})).items() %}
+              <b>{{ fname }}:</b><pre class="d">{{ content }}</pre>
+            {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="sc"><h4>Full Output</h4><pre class="d">{{ h.raw_stdout | default('') }}</pre></div>
+            {% if h.raw_stderr | default('') | length > 0 %}
+            <div class="sc"><h4>Stderr</h4><pre class="d">{{ h.raw_stderr }}</pre></div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          </div>
+          </div>
+
+          <script>
+          function showVM(i){document.querySelectorAll('.vi').forEach(function(e){e.classList.remove('on')});document.querySelectorAll('.pn').forEach(function(e){e.classList.remove('on')});document.getElementById('n'+i).classList.add('on');document.getElementById('v'+i).classList.add('on');document.getElementById('mn').scrollTop=0}
+          </script>
+          </body>
+          </html>
+      become: true
+
+    - name: Display report location
+      ansible.builtin.debug:
+        msg: "Reports written to {{ local_report_file }} and /var/www/html/"
+
+    - name: Display summary
+      ansible.builtin.debug:
+        msg: >-
+          NVMe Readiness Summary:
+          Total={{ full_report.summary.total }}
+          Ready={{ full_report.summary.ready }}
+          NeedsChanges={{ full_report.summary.needs_changes }}
+          WithErrors={{ full_report.summary.errors }}
+          Unreachable={{ full_report.summary.unreachable }}
