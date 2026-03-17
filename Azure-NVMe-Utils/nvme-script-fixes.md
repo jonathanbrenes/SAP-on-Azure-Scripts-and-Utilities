@@ -8,6 +8,30 @@
 
 ---
 
+## Implementation Status
+
+> **Last updated:** 2026-03-17 — all fixes implemented across PS1, standalone script, and playbook
+
+| Fix # | Severity | Title | Status | Notes |
+|---|---|---|---|---|
+| — | CRITICAL | Gen1 detection bug | ✅ Done | Gen1 check moved before controller type check; `exit` added; null `DiskControllerType` treated as SCSI |
+| 1 | CRITICAL | `grub2-mkconfig` output path missing `.cfg` | ✅ Done | All occurrences now write to `/boot/grub2/grub.cfg` |
+| 2 | CRITICAL | Missing `GRUB_DISABLE_OS_PROBER=true` | ✅ Done | Prefixed on all `grub2-mkconfig` and `update-grub` calls |
+| 3 | CRITICAL | SUSE uses wrong GRUB variable | ✅ Done | SUSE has own `suse\|sles\|opensuse*` case targeting `GRUB_CMDLINE_LINUX_DEFAULT` |
+| 4 | HIGH | `almalinux` not in case statements | ✅ Done | Added to `check_nvme_driver()` and `check_nvme_timeout()` |
+| 5 | HIGH | `azurelinux` not in case statements | ✅ Done | Added as `azurelinux\|mariner` to both functions |
+| 6 | MEDIUM | BLS systems need `grubby` | ✅ Done | `grubby --update-kernel=ALL --args=...` added after grub2-mkconfig for RHEL and OL when BLS enabled |
+| 7 | MEDIUM | Verification grep checks non-existent files | ✅ Done | Dynamic `_grub_check_files` variable + `2>/dev/null`; removed hardcoded `/etc/grub.conf` and `/boot/grub/grub.cfg` |
+| 8 | MEDIUM | OL 7.9/8.2 dracut gap | ✅ Done | `pci-hyperv` added alongside `nvme nvme-core` in dracut config |
+| 9 | MEDIUM | `/etc/default/grub.conf` fallback is dead code | ✅ Done | Removed all `elif [ -f /etc/default/grub.conf ]` branches |
+| 10 | LOW | `lsinitrd` checks only default kernel | ⏭️ Deferred | Low risk — dracut -f also only rebuilds current kernel |
+| 11 | LOW | fstab check does not flag LVM paths | ✅ Done | Added comment explaining `/dev/mapper/*` and `PARTUUID=` are safe |
+| 12 | LOW | Inconsistent `sudo` usage | ✅ Done | Removed all `sudo` prefixes — script runs as root via `Invoke-AzVMRunCommand` |
+
+**Dry-run test results (2026-03-17, run 2 — with BLS detection):** 39 of 41 Gen2 x64 VMs returned `ready=true` with zero errors and zero stderr. 12 need grub changes (`nvme_core.io_timeout=240`), of which 6 also have BLS enabled and need `grubby --update-kernel=ALL`. 2 hosts were unreachable. All Fix 7 stderr noise confirmed resolved.
+
+---
+
 ## Table of Contents
 
 1. [Current script structure](#1-current-script-structure)

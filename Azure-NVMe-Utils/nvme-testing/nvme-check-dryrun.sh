@@ -141,13 +141,13 @@ check_nvme_driver() {
                 if $fix; then
                     if $dry_run; then
                         echo "[DRYRUN] Would run: dracut -f (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
-                        echo 'add_drivers+=" nvme nvme-core "' > "$staging_dir/modified/dracut-nvme.conf"
+                        echo 'add_drivers+=" nvme nvme-core pci-hyperv "' > "$staging_dir/modified/dracut-nvme.conf"
                         echo "dracut -f" >> "$staging_dir/modified/initramfs-commands.txt"
                     else
                         echo "[INFO] Adding NVMe driver to initrd/initramfs..."
                         mkdir -p /etc/dracut.conf.d
-                        echo 'add_drivers+=" nvme nvme-core "' | sudo tee /etc/dracut.conf.d/nvme.conf > /dev/null
-                        sudo dracut -f   
+                        echo 'add_drivers+=" nvme nvme-core pci-hyperv "' | tee /etc/dracut.conf.d/nvme.conf > /dev/null
+                        dracut -f
                         if lsinitrd | grep -q nvme; then
                             echo "[INFO] NVMe driver added successfully."
                         else
@@ -169,7 +169,16 @@ check_nvme_driver() {
 # Function to check nvme_core.io_timeout parameter
 check_nvme_timeout() {
     echo "[INFO] Checking nvme_core.io_timeout parameter..."
-    if grep -q "nvme_core.io_timeout=240" /etc/default/grub /etc/grub.conf /boot/grub/grub.cfg; then
+
+    # Build grub file list dynamically for verification
+    _grub_check_files="/etc/default/grub"
+    if [ -f /boot/grub2/grub.cfg ]; then
+        _grub_check_files="$_grub_check_files /boot/grub2/grub.cfg"
+    elif [ -f /boot/grub/grub.cfg ]; then
+        _grub_check_files="$_grub_check_files /boot/grub/grub.cfg"
+    fi
+
+    if grep -q "nvme_core.io_timeout=240" $_grub_check_files 2>/dev/null; then
         echo "[INFO] nvme_core.io_timeout is set to 240."
         if $dry_run && $fix; then
             echo "[DRYRUN] nvme_core.io_timeout already set to 240. No grub changes needed."
@@ -185,8 +194,6 @@ check_nvme_timeout() {
                 local grub_file=""
                 if [ -f /etc/default/grub ]; then
                     grub_file="/etc/default/grub"
-                elif [ -f /etc/default/grub.conf ]; then
-                    grub_file="/etc/default/grub.conf"
                 fi
                 if [ -n "$grub_file" ]; then
                     cp "$grub_file" "$staging_dir/original/grub"
@@ -194,6 +201,9 @@ check_nvme_timeout() {
                     case "$distro" in
                         ubuntu|debian)
                             sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub"
+                            ;;
+                        suse|sles|opensuse*)
+                            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub"
                             ;;
                         ol)
                             sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub"
@@ -205,6 +215,19 @@ check_nvme_timeout() {
                     diff -u "$staging_dir/original/grub" "$staging_dir/modified/grub" > "$staging_dir/diffs/grub.diff" 2>&1 || true
                     echo "[DRYRUN] Grub diff staged in $staging_dir/diffs/grub.diff"
                     cat "$staging_dir/diffs/grub.diff"
+                    # Check for BLS (BootLoaderSpec) — RHEL 8+, AlmaLinux 8+, OL 8.10+
+                    if grep -q "GRUB_ENABLE_BLSCFG=true" "$grub_file" 2>/dev/null; then
+                        echo "[INFO] BLS (BootLoaderSpec) is enabled."
+                        if command -v grubby &>/dev/null; then
+                            echo "[DRYRUN] Would run: grubby --update-kernel=ALL --args=nvme_core.io_timeout=240"
+                            echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                            echo "grubby_available=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                        else
+                            echo "[WARNING] BLS is enabled but grubby is not installed."
+                            echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                            echo "grubby_available=false" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                        fi
+                    fi
                 else
                     echo "[DRYRUN] No grub config found to stage."
                 fi
@@ -213,30 +236,47 @@ check_nvme_timeout() {
                 case "$distro" in
                     ubuntu|debian)
                         sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' /etc/default/grub
-                        update-grub
+                        GRUB_DISABLE_OS_PROBER=true update-grub
                         ;;
-                    redhat|rhel|centos|rocky|almalinux|azurelinux|mariner|suse|sles)
+                    suse|sles|opensuse*)
+                        if [ -f /etc/default/grub ]; then
+                            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' /etc/default/grub
+                            GRUB_DISABLE_OS_PROBER=true grub2-mkconfig -o /boot/grub2/grub.cfg
+                        else
+                            echo "[ERROR] /etc/default/grub not found."
+                            return 1
+                        fi
+                        ;;
+                    redhat|rhel|centos|rocky|almalinux|azurelinux|mariner)
                         if [ -f /etc/default/grub ]; then
                             sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' /etc/default/grub
-                            grub2-mkconfig -o /boot/grub2/grub
-                        elif [ -f /etc/default/grub.conf ]; then
-                            sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' /etc/default/grub.conf
-                            grub2-mkconfig -o /boot/grub2/grub.cfg
+                            GRUB_DISABLE_OS_PROBER=true grub2-mkconfig -o /boot/grub2/grub.cfg
+                            # Update BLS entries if applicable (RHEL 8+, AlmaLinux 8+)
+                            if grep -q "GRUB_ENABLE_BLSCFG=true" /etc/default/grub 2>/dev/null; then
+                                if command -v grubby &>/dev/null; then
+                                    grubby --update-kernel=ALL --args="nvme_core.io_timeout=240"
+                                    echo "[INFO] Updated BLS entries via grubby."
+                                fi
+                            fi
                         else
-                            echo "[ERROR] No grub config found."
-                            exit 1
+                            echo "[ERROR] /etc/default/grub not found."
+                            return 1
                         fi
                         ;;
                     ol)
                         if [ -f /etc/default/grub ]; then
                             sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' /etc/default/grub
-                            grub2-mkconfig -o /boot/grub2/grub
-                        elif [ -f /etc/default/grub.conf ]; then
-                            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' /etc/default/grub.conf
-                            grub2-mkconfig -o /boot/grub2/grub.cfg
+                            GRUB_DISABLE_OS_PROBER=true grub2-mkconfig -o /boot/grub2/grub.cfg
+                            # Update BLS entries if applicable (OL 8.10+)
+                            if grep -q "GRUB_ENABLE_BLSCFG=true" /etc/default/grub 2>/dev/null; then
+                                if command -v grubby &>/dev/null; then
+                                    grubby --update-kernel=ALL --args="nvme_core.io_timeout=240"
+                                    echo "[INFO] Updated BLS entries via grubby."
+                                fi
+                            fi
                         else
-                            echo "[ERROR] No grub config found."
-                            exit 1
+                            echo "[ERROR] /etc/default/grub not found."
+                            return 1
                         fi
                         ;;
                     *)
@@ -245,7 +285,7 @@ check_nvme_timeout() {
                         ;;
                 esac
 
-                if grep -q "nvme_core.io_timeout=240" /etc/default/grub /etc/grub.conf /boot/grub/grub.cfg; then
+                if grep -q "nvme_core.io_timeout=240" $_grub_check_files 2>/dev/null; then
                     echo "[INFO] nvme_core.io_timeout set successfully."
                 else
                     echo "[ERROR] Failed to set nvme_core.io_timeout."
@@ -260,6 +300,9 @@ check_nvme_timeout() {
 # Function to check /etc/fstab for deprecated device names
 check_fstab() {
     echo "[INFO] Checking /etc/fstab for deprecated device names..."
+    # NOTE: /dev/mapper/* (LVM) and PARTUUID= paths survive NVMe conversion
+    # because they use UUID-based addressing underneath. Only /dev/sd* and
+    # /dev/disk/azure/scsi* paths break when disks move from SCSI to NVMe.
     if grep -Eq '/dev/sd[a-z][0-9]*|/dev/disk/azure/scsi[0-9]*/lun[0-9]*' /etc/fstab; then
         if $fix; then
             echo "[WARNING] /etc/fstab contains deprecated device names."

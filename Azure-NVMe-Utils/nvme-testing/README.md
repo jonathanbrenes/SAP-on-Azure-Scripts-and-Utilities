@@ -131,42 +131,45 @@ Once all hosts pass dry-run validation (Phase 1 clean), execute the actual SCSI-
 
 ### Convert All VMs in a Resource Group
 
-Use a PowerShell loop to iterate over every VM in the resource group:
+Use `ForEach-Object -Parallel` to process VMs concurrently (PowerShell 7+):
 
 ```powershell
 # Define parameters
 $ResourceGroup = "myRG"
 $NewVMSize     = "Standard_E2bds_v5"   # Target NVMe-capable size
 $Controller    = "NVMe"
+$ThrottleLimit = 10                     # Max concurrent VMs
 
 # Get all VMs in the resource group
 $vms = Get-AzVM -ResourceGroupName $ResourceGroup
 
 Write-Host "Found $($vms.Count) VMs in resource group '$ResourceGroup'" -ForegroundColor Cyan
 
-# Dry-run first (recommended) — validates without converting
-foreach ($vm in $vms) {
-    Write-Host "=== DRY-RUN: $($vm.Name) ===" -ForegroundColor Yellow
+# Dry-run first (recommended) — validates without converting, runs in parallel
+$vms | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
+    Write-Host "=== DRY-RUN: $($_.Name) ===" -ForegroundColor Yellow
     .\Azure-NVMe-Conversion.ps1 `
-        -ResourceGroupName $ResourceGroup `
-        -VMName $vm.Name `
-        -NewControllerType $Controller `
-        -VMSize $NewVMSize `
+        -ResourceGroupName $using:ResourceGroup `
+        -VMName $_.Name `
+        -NewControllerType $using:Controller `
+        -VMSize $using:NewVMSize `
         -DryRun -WriteLogfile
 }
 
-# When dry-run is clean, execute the actual conversion
-foreach ($vm in $vms) {
-    Write-Host "=== CONVERTING: $($vm.Name) ===" -ForegroundColor Green
+# When dry-run is clean, execute the actual conversion in parallel
+$vms | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
+    Write-Host "=== CONVERTING: $($_.Name) ===" -ForegroundColor Green
     .\Azure-NVMe-Conversion.ps1 `
-        -ResourceGroupName $ResourceGroup `
-        -VMName $vm.Name `
-        -NewControllerType $Controller `
-        -VMSize $NewVMSize `
+        -ResourceGroupName $using:ResourceGroup `
+        -VMName $_.Name `
+        -NewControllerType $using:Controller `
+        -VMSize $using:NewVMSize `
         -FixOperatingSystemSettings `
         -StartVM -WriteLogfile
 }
 ```
+
+> **Note:** `ForEach-Object -Parallel` requires PowerShell 7+. Each parallel runspace creates its own Azure context, so ensure `Connect-AzAccount` has been run in the session. Adjust `-ThrottleLimit` based on Azure API rate limits and subscription quotas (10 is a safe default).
 
 ### Convert VMs with Per-VM Size Mapping
 
@@ -174,6 +177,7 @@ If different VMs need different target sizes:
 
 ```powershell
 $ResourceGroup = "myRG"
+$ThrottleLimit = 10
 
 # Define size mapping per VM (or use a CSV)
 $vmSizeMap = @{
@@ -182,11 +186,12 @@ $vmSizeMap = @{
     "sapvm03" = "Standard_E2bds_v5"
 }
 
-foreach ($vmName in $vmSizeMap.Keys) {
-    $targetSize = $vmSizeMap[$vmName]
+$vmSizeMap.GetEnumerator() | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
+    $vmName    = $_.Key
+    $targetSize = $_.Value
     Write-Host "=== CONVERTING: $vmName -> $targetSize ===" -ForegroundColor Green
     .\Azure-NVMe-Conversion.ps1 `
-        -ResourceGroupName $ResourceGroup `
+        -ResourceGroupName $using:ResourceGroup `
         -VMName $vmName `
         -NewControllerType NVMe `
         -VMSize $targetSize `
@@ -218,148 +223,106 @@ foreach ($vmName in $vmSizeMap.Keys) {
 | `nvme-dryrun-playbook.yml` | Self-contained Ansible playbook — runs dry-run assessment and produces JSON + HTML reports |
 | `nvme-check-dryrun.sh` | Standalone bash script — supports check, fix, and dry-run modes via `-fix` and `-dry` flags |
 | `scsi2nvme-tester.html` | Browser-based ARM template builder for deploying a test lab in Azure |
-| `results.json` | Sample output from an 81-host dry-run assessment |
+| `results.json` | Sample output from a 39-host dry-run assessment (Gen2 x64 only) |
 
 ## Tested VM Images
 
-The following 81 Azure Marketplace images (x64 only, Gen1 + Gen2) were validated in the dry-run assessment. All returned `ready=true` with zero errors.
+The following 39 Azure Marketplace images (x64, Gen2 only) were validated in the dry-run assessment. All returned `ready=true` with zero errors and zero stderr noise.
 
-### AlmaLinux (6 images)
-
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| almalinux-x86-64-8-gen1-x64-gen1 | 8.10 | 4.18.0-553.72.1.el8_10.x86_64 | No |
-| almalinux-x86-64-8-gen2-x64-gen2 | 8.10 | 4.18.0-553.72.1.el8_10.x86_64 | No |
-| almalinux-x86-64-9-gen1-x64-gen1 | 9.7 | 5.14.0-611.13.1.el9_7.x86_64 | No |
-| almalinux-x86-64-9-gen2-x64-gen2 | 9.7 | 5.14.0-611.13.1.el9_7.x86_64 | No |
-| almalinux-x86-64-10-gen1-x64-gen1 | 10.1 | 6.12.0-124.20.1.el10_1.x86_64 | No |
-| almalinux-x86-64-10-gen2-x64-gen2 | 10.1 | 6.12.0-124.20.1.el10_1.x86_64 | No |
-
-### Azure Linux / Mariner (4 images)
+### AlmaLinux (3 images)
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
-| azure-linux-3-azure-linux-3-x64-gen1 | 3.0 | 6.6.126.1-1.azl3 | Yes — initramfs |
-| azure-linux-3-azure-linux-3-gen2-x64-gen2 | 3.0 | 6.6.126.1-1.azl3 | Yes — initramfs |
-| azure-linux-3-azure-linux-3-fips-x64-gen1 | 3.0 | 6.6.126.1-1.azl3 | Yes — initramfs |
-| azure-linux-3-azure-linux-3-gen2-fips-x64-gen2 | 3.0 | 6.6.126.1-1.azl3 | Yes — initramfs |
+| almalinux-x86-64-8-gen2-x64-gen2-latest | 8.10 | 4.18.0-553.72.1.el8_10.x86_64 | No |
+| almalinux-x86-64-9-gen2-x64-gen2-latest | 9.7 | 5.14.0-611.13.1.el9_7.x86_64 | No |
+| almalinux-x86-64-10-gen2-x64-gen2-latest | 10.1 | 6.12.0-124.20.1.el10_1.x86_64 | No |
 
-### Debian (6 images)
-
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| debian-11-11-x64-gen1 | 11 | 5.10.0-38-cloud-amd64 | Yes — initramfs |
-| debian-11-11-gen2-x64-gen2 | 11 | 5.10.0-38-cloud-amd64 | Yes — initramfs |
-| debian-12-12-x64-gen1 | 12.13 | 6.1.0-44-cloud-amd64 | No |
-| debian-12-12-gen2-x64-gen2 | 12.13 | 6.1.0-44-cloud-amd64 | No |
-| debian-13-13-x64-gen1 | 13.3 | 6.12.74+deb13+1-cloud-amd64 | No |
-| debian-13-13-gen2-x64-gen2 | 13.3 | 6.12.74+deb13+1-cloud-amd64 | No |
-
-### Oracle Linux (9 images)
+### Azure Linux (2 images)
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
-| oracle-linux-ol79-gen2-x64-gen2 | 7.9 | 5.4.17-2036.101.2.el7uek.x86_64 | Yes — initramfs, grub |
-| oracle-linux-ol82-gen2-x64-gen2 | 8.2 | 5.4.17-2011.4.6.el8uek.x86_64 | Yes — initramfs, grub |
-| oracle-linux-ol810-lvm-x64-gen1 | 8.10 | 5.15.0-317.197.5.1.el8uek.x86_64 | Yes — grub |
-| oracle-linux-ol810-lvm-gen2-x64-gen2 | 8.10 | 5.15.0-317.197.5.1.el8uek.x86_64 | Yes — grub |
-| oracle-linux-ol95-lvm-x64-gen1 | 9.5 | 5.15.0-307.178.5.el9uek.x86_64 | Yes — grub |
-| oracle-linux-ol95-lvm-gen2-x64-gen2 | 9.5 | 5.15.0-307.178.5.el9uek.x86_64 | Yes — grub |
-| oracle-linux-ol96-lvm-x64-gen1 | 9.6 | 6.12.0-104.43.4.2.el9uek.x86_64 | Yes — grub |
-| oracle-linux-ol10-lvm-x64-gen1 | 10.0 | 6.12.0-104.43.4.3.el10uek.x86_64 | Yes — grub |
-| oracle-linux-ol10-lvm-gen2-x64-gen2 | 10.0 | 6.12.0-104.43.4.3.el10uek.x86_64 | Yes — grub |
+| azure-linux-3-azure-linux-3-gen2-x64-gen2-latest | 3.0 | 6.6.126.1-1.azl3 | Yes — grub |
+| azure-linux-3-azure-linux-3-gen2-fips-x64-gen2-latest | 3.0 | 6.6.126.1-1.azl3 | Yes — grub |
 
-### RHEL (21 images)
+### Debian (3 images)
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
-| rhel-7-6-x64-gen1 | 7.6 | 3.10.0-957.72.1.el7.x86_64 | Yes — initramfs, grub |
-| rhel-7-8-x64-gen1 | 7.8 | 3.10.0-1127.el7.x86_64 | Yes — initramfs, grub |
-| rhel-8-9-x64-gen1 | 8.9 | 4.18.0-513.18.1.el8_9.x86_64 | Yes — grub |
-| rhel-raw-8-4-x64-gen1 | 8.4 | 4.18.0-305.40.1.el8_4.x86_64 | Yes — initramfs, grub |
-| rhel-raw-8-9-x64-gen1 | 8.9 | 4.18.0-513.11.1.el8_9.x86_64 | Yes — grub |
-| rhel-raw-89-gen2-x64-gen2 | 8.9 | 4.18.0-513.11.1.el8_9.x86_64 | Yes — grub |
-| rhel-ha-8-8-x64-gen1 | 8.8 | 4.18.0-477.36.1.el8_8.x86_64 | Yes — grub |
-| rhel-8-lvm-gen2-x64-gen2 | 8.10 | 4.18.0-553.el8_10.x86_64 | Yes — grub |
+| debian-11-11-gen2-x64-gen2-latest | 11 | 5.10.0-38-cloud-amd64 | Yes — grub |
+| debian-12-12-gen2-x64-gen2-latest | 12.13 | 6.1.0-44-cloud-amd64 | No |
+| debian-13-13-gen2-x64-gen2-latest | 13.3 | 6.12.74+deb13+1-cloud-amd64 | No |
+
+### Oracle Linux (5 images)
+
+| Hostname | Version | Kernel | Needs Changes |
+|---|---|---|---|
+| oracle-linux-ol79-gen2-x64-gen2-latest | 7.9 | 5.4.17-2036.101.2.el7uek.x86_64 | Yes — grub |
+| oracle-linux-ol82-gen2-x64-gen2-latest | 8.2 | 5.4.17-2011.4.6.el8uek.x86_64 | Yes — initramfs, grub |
+| oracle-linux-ol810-lvm-gen2-x64-gen2-latest | 8.10 | 5.15.0-317.197.5.1.el8uek.x86_64 | Yes — grub, grubby (BLS) |
+| oracle-linux-ol95-lvm-gen2-x64-gen2-latest | 9.5 | 5.15.0-307.178.5.el9uek.x86_64 | Yes — grub, grubby (BLS) |
+| oracle-linux-ol10-lvm-gen2-x64-gen2-latest | 10.0 | 6.12.0-104.43.4.3.el10uek.x86_64 | Yes — grub, grubby (BLS) |
+
+### RHEL (9 images)
+
+| Hostname | Version | Kernel | Needs Changes |
+|---|---|---|---|
+| rhel-8-lvm-gen2-x64-gen2 | 8.10 | 4.18.0-553.el8_10.x86_64 | Yes — grub, grubby (BLS) |
 | rhel-raw-8-raw-gen2-x64-gen2 | 8.10 | 4.18.0-553.56.1.el8_10.x86_64 | No |
-| rhel-raw-8-raw-x64-gen1 | 8.10 | 4.18.0-553.56.1.el8_10.x86_64 | No |
-| rhel-raw-9-5-x64-gen1 | 9.5 | 5.14.0-503.15.1.el9_5.x86_64 | Yes — grub |
-| rhel-sap-ha-84sapha-gen2-x64-gen2 | 8.4 | 4.18.0-305.150.1.el8_4.x86_64 | Yes — grub |
+| rhel-raw-89-gen2-x64-gen2 | 8.9 | 4.18.0-513.11.1.el8_9.x86_64 | Yes — grub, grubby (BLS) |
+| rhel-sap-ha-84sapha-gen2-x64-gen2 | 8.4 | 4.18.0-305.150.1.el8_4.x86_64 | Yes — grub, grubby (BLS) |
 | rhel-sap-ha-96sapha-gen2-x64-gen2 | 9.6 | 5.14.0-570.94.1.el9_6.x86_64 | No |
-| rhel-9-7-x64-gen1 | 9.7 | 5.14.0-611.36.1.el9_7.x86_64 | No |
 | rhel-9-lvm-gen2-x64-gen2 | 9.7 | 5.14.0-611.36.1.el9_7.x86_64 | No |
 | rhel-raw-9-raw-gen2-x64-gen2 | 9.7 | 5.14.0-611.36.1.el9_7.x86_64 | No |
-| rhel-raw-9-raw-x64-gen1 | 9.7 | 5.14.0-611.36.1.el9_7.x86_64 | No |
-| rhel-10-1-x64-gen1 | 10.1 | 6.12.0-124.38.1.el10_1.x86_64 | No |
 | rhel-10-lvm-gen2-x64-gen2 | 10.1 | 6.12.0-124.38.1.el10_1.x86_64 | No |
-| rhel-raw-10-1-x64-gen1 | 10.1 | 6.12.0-124.38.1.el10_1.x86_64 | No |
 | rhel-raw-10-raw-gen2-x64-gen2 | 10.1 | 6.12.0-124.38.1.el10_1.x86_64 | No |
 
-### SLES (7 images)
+### SLES (4 images)
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
-| sles-12-sp5-gen2-x64-gen2 | 12.5 | 4.12.14-16.200-azure | Yes — initramfs, grub |
+| sles-12-sp5-gen2-x64-gen2-latest | 12.5 | 4.12.14-16.200-azure | Yes — grub |
 | sles-15-sp6-gen2-x64-gen2 | 15.6 | 6.4.0-150600.8.58-azure | No |
-| sles-15-sp7-gen1-x64-gen1 | 15.7 | 6.4.0-150700.20.24-azure | No |
 | sles-15-sp7-basic-gen2-x64-gen2 | 15.7 | 6.4.0-150700.20.24-azure | No |
-| sles-16-0-x86-64-gen1-x64-gen1 | 16.0 | 6.12.0-160000.9-default | No |
 | sles-16-0-x86-64-gen2-x64-gen2 | 16.0 | 6.12.0-160000.9-default | No |
-| sles-sap-15-sp7-gen1-x64-gen1 | 15.7 | 6.4.0-150700.53.28-default | No |
 
-### SLES SAP (2 images)
+### SLES SAP (1 image)
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
-| sles-sap-15-sp7-gen1-x64-gen1 | 15.7 | 6.4.0-150700.53.28-default | No |
 | sles-sap-15-sp7-gen2-x64-gen2 | 15.7 | 6.4.0-150700.53.28-default | No |
 
-### Ubuntu (28 images)
+### Ubuntu (12 images)
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
-| 0001-com-ubuntu-server-focal-20-04-lts-x64-gen1 | 20.04 | 5.15.0-1089-azure | No |
-| 0001-com-ubuntu-server-focal-20-04-lts-gen2-x64-gen2 | 20.04 | 5.15.0-1089-azure | No |
-| 0001-com-ubuntu-minimal-focal-minimal-20-04-lts-x64-gen1 | 20.04 | 5.15.0-1089-azure | No |
-| ubuntu-22-04-lts-server-gen1-x64-gen1 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-server-x64-gen2 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-minimal-gen1-x64-gen1 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-minimal-x64-gen2 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-pro-gen1-x64-gen1 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-pro-x64-gen2 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-pro-minimal-gen1-x64-gen1 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-pro-minimal-x64-gen2 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-pro-fips-x64-gen2 | 22.04 | 5.15.0-1102-azure-fips | No |
-| 0001-com-ubuntu-server-jammy-22-04-lts-x64-gen1 | 22.04 | 6.8.0-1044-azure | No |
-| 0001-com-ubuntu-server-jammy-22-04-lts-gen2-x64-gen2 | 22.04 | 6.8.0-1044-azure | No |
-| 0001-com-ubuntu-minimal-jammy-minimal-22-04-lts-x64-gen1 | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-24-04-lts-server-gen1-x64-gen1 | 24.04 | 6.17.0-1008-azure | No |
+| 0001-com-ubuntu-server-focal-20-04-lts-gen2-x64-gen2-latest | 20.04 | 5.15.0-1089-azure | No |
+| 0001-com-ubuntu-server-jammy-22-04-lts-gen2-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
+| ubuntu-22-04-lts-server-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
+| ubuntu-22-04-lts-ubuntu-minimal-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
+| ubuntu-22-04-lts-ubuntu-pro-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
+| ubuntu-22-04-lts-ubuntu-pro-minimal-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
 | ubuntu-24-04-lts-server-x64-gen2 | 24.04 | 6.17.0-1008-azure | No |
-| ubuntu-24-04-lts-minimal-gen1-x64-gen1 | 24.04 | 6.14.0-1017-azure | No |
-| ubuntu-24-04-lts-minimal-x64-gen2 | 24.04 | 6.14.0-1017-azure | No |
-| ubuntu-24-04-lts-ubuntu-pro-gen1-x64-gen1 | 24.04 | 6.14.0-1017-azure | No |
-| ubuntu-24-04-lts-ubuntu-pro-x64-gen2 | 24.04 | 6.14.0-1017-azure | No |
-| ubuntu-24-04-lts-ubuntu-pro-minimal-x64-gen2 | 24.04 | 6.17.0-1008-azure | No |
-| ubuntu-25-10-server-gen1-x64-gen1 | 25.10 | 6.17.0-1006-azure | No |
-| ubuntu-25-10-server-x64-gen2 | 25.10 | 6.17.0-1006-azure | No |
-| ubuntu-25-10-minimal-gen1-x64-gen1 | 25.10 | 6.17.0-1006-azure | No |
-| ubuntu-25-10-minimal-x64-gen2 | 25.10 | 6.17.0-1006-azure | No |
+| ubuntu-24-04-lts-minimal-x64-gen2-latest | 24.04 | 6.14.0-1017-azure | No |
+| ubuntu-24-04-lts-ubuntu-pro-x64-gen2-latest | 24.04 | 6.14.0-1017-azure | No |
+| ubuntu-24-04-lts-ubuntu-pro-minimal-x64-gen2-latest | 24.04 | 6.17.0-1008-azure | No |
+| ubuntu-25-10-server-x64-gen2-latest | 25.10 | 6.17.0-1006-azure | No |
+| ubuntu-25-10-minimal-x64-gen2-latest | 25.10 | 6.17.0-1006-azure | No |
 
 ### Summary
 
-| Distro | Images | Ready | Needs Changes |
-|---|---|---|---|
-| AlmaLinux | 6 | 6 | 0 |
-| Azure Linux | 4 | 4 | 4 |
-| Debian | 6 | 6 | 2 |
-| Oracle Linux | 9 | 9 | 9 |
-| RHEL | 21 | 21 | 10 |
-| SLES | 7 | 7 | 1 |
-| SLES SAP | 2 | 2 | 0 |
-| Ubuntu | 28 | 28 | 0 |
-| **Total** | **81** | **81** | **26** |
+| Distro | Images | Ready | Needs Changes | BLS (grubby) |
+|---|---|---|---|---|
+| AlmaLinux | 3 | 3 | 0 | 0 |
+| Azure Linux | 2 | 2 | 2 | 0 |
+| Debian | 3 | 3 | 1 | 0 |
+| Oracle Linux | 5 | 5 | 5 | 3 |
+| RHEL | 9 | 9 | 3 | 3 |
+| SLES | 4 | 4 | 1 | 0 |
+| SLES SAP | 1 | 1 | 0 | 0 |
+| Ubuntu | 12 | 12 | 0 | 0 |
+| **Total** | **39** | **39** | **12** | **6** |
 
-> All 81 images returned `ready=true` (exit code 0). The 26 that need changes require only `nvme_core.io_timeout=240` in grub and/or initramfs rebuild — fixable via Phase 2.
+> All 39 images returned `ready=true` (exit code 0) with zero stderr. The 12 that need changes require `nvme_core.io_timeout=240` in grub (and/or initramfs rebuild). Of those, 6 also have BLS enabled and need `grubby --update-kernel=ALL` — all fixable via Phase 2. 2 hosts were unreachable (41 targeted, 39 responded). The FIPS image (`ubuntu-22-04-lts-ubuntu-pro-fips-x64-gen2-latest`) was excluded from this run.
 
 ---
 
@@ -367,21 +330,13 @@ The following 81 Azure Marketplace images (x64 only, Gen1 + Gen2) were validated
 
 ```json
 {
-    "generated_at": "2026-03-16T23:41:16Z",
-    "total_hosts": 83,
-    "collected_hosts": "81",
-    "unreachable_hosts": "2",
-    "summary": {
-        "ready": 81,
-        "needs_changes": 26,
-        "errors": 0,
-        "total": 81,
-        "unreachable": 2
+    "_meta": {
+        "description": "SCSI-to-NVMe Conversion Dry-Run Assessment - 41 hosts",
+        "generated_at": "2026-03-17T13:26:55Z",
+        "total_hosts": "41"
     },
-    "results": [
-        {
-            "hostname": "rhel-10-1-x64-gen1",
-            "ip": "10.10.0.10",
+    "hosts": {
+        "rhel-10-lvm-gen2-x64-gen2": {
             "distro": "redhat",
             "distro_version": "10.1",
             "kernel": "6.12.0-124.38.1.el10_1.x86_64",
@@ -389,16 +344,13 @@ The following 81 Azure Marketplace images (x64 only, Gen1 + Gen2) were validated
             "ready": true,
             "needs_changes": false,
             "error_count": "0",
-            "warning_count": "0",
             "errors": [],
-            "warnings": [],
-            "info": ["[INFO] Operating system detected: rhel", "..."],
             "dryrun": ["[DRYRUN] NVMe driver already in initramfs...", "..."],
             "staged_files": { "distro": "rhel\n", "kernel": "6.12...\n" },
             "raw_stdout": "...",
             "raw_stderr": ""
         }
-    ]
+    }
 }
 ```
 
@@ -414,5 +366,5 @@ The following 81 Azure Marketplace images (x64 only, Gen1 + Gen2) were validated
 
 ```bash
 # Show grub diffs for servers that need timeout changes
-jq '[.results[] | select(.staged_files["diffs/grub.diff"] != null) | {hostname, diff: .staged_files["diffs/grub.diff"]}]' nvme-dryrun-report.json
+jq '[.hosts | to_entries[] | select(.value.staged_files["diffs/grub.diff"] != null) | {hostname: .key, diff: .value.staged_files["diffs/grub.diff"]}]' nvme-dryrun-report.json
 ```

@@ -95,10 +95,10 @@
     <div id="helpBalloon" class="help-balloon" role="dialog" aria-label="Help" aria-hidden="true">
       <h4>About SCSI-to-NVMe Multi-Image Test Lab Builder</h4>
       <ul>
-        <li><strong>Purpose:</strong> Generates an ARM template that deploys one control VM plus one VM per image in the catalog (98 images across RedHat, Debian, Canonical, SUSE, AlmaLinux, and Azure Linux), for automated SCSI-to-NVMe conversion testing.</li>
+        <li><strong>Purpose:</strong> Generates an ARM template that deploys one control VM plus one VM per image in the catalog (112 images across RedHat, Debian, Canonical, SUSE, AlmaLinux, and Azure Linux), for automated SCSI-to-NVMe conversion testing.</li>
         <li><strong>Control VM:</strong> A RHEL 9 Gen2 Standard_B2s VM with Ansible, httpd, and a key server. After deployment, it automatically polls all image VMs with ping (30 forks) and runs the test playbook once all VMs are online. A live status page is served on port 80.</li>
         <li><strong>Image filters:</strong> Narrow the catalog by architecture (x64/Arm64), generation (Gen1/Gen2), disk controller (All/NVMe capable/SCSI only), or publisher. The smallest compatible VM size is auto-selected per image.</li>
-        <li><strong>Disk controller &ldquo;All&rdquo; mode:</strong> Deploys both SCSI and NVMe variants for NVMe-capable images, producing up to 132 VMs (98 SCSI + 34 NVMe) at full catalog.</li>
+        <li><strong>Disk controller &ldquo;All&rdquo; mode:</strong> Deploys both SCSI and NVMe variants for NVMe-capable images, producing up to 175 VMs (112 SCSI + 63 NVMe) at full catalog.</li>
         <li><strong>Force VM size:</strong> Override automatic size selection to use a specific VM size for all compatible images. The dropdown auto-filters to sizes compatible with the current image set.</li>
         <li><strong>Force images:</strong> Pick specific images from the catalog instead of deploying all filtered images.</li>
         <li><strong>Quota guard &amp; multi-region:</strong> Set a regional vCPU limit (default 100). When projected usage exceeds the limit, VMs are automatically split across multiple regions. Multi-region deployments use a subscription-scope ARM template with per-region resource groups and hub-spoke VNet peering so the control VM can reach all image VMs via private IPs.</li>
@@ -1605,7 +1605,7 @@ const DEFAULT_TEST_YAML = String.raw`---
                           echo "[WARNING] NVMe driver not found in initrd/initramfs."
                           modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in the initramfs."
                           echo "[DRYRUN] Would run: dracut -f"
-                          echo 'add_drivers+=" nvme nvme-core "' > "$staging_dir/modified/dracut-nvme.conf"
+                          echo 'add_drivers+=" nvme nvme-core pci-hyperv "' > "$staging_dir/modified/dracut-nvme.conf"
                           echo "dracut -f" > "$staging_dir/modified/initramfs-commands.txt"
                       fi ;;
                   *) echo "[ERROR] Unsupported distribution for NVMe driver check."; return 1 ;;
@@ -1614,7 +1614,14 @@ const DEFAULT_TEST_YAML = String.raw`---
 
           check_nvme_timeout() {
               echo "[INFO] Checking nvme_core.io_timeout parameter..."
-              if grep -q "nvme_core.io_timeout=240" /etc/default/grub /etc/grub.conf /boot/grub/grub.cfg 2>/dev/null; then
+              # Build grub file list dynamically for verification
+              _grub_check_files="/etc/default/grub"
+              if [ -f /boot/grub2/grub.cfg ]; then
+                  _grub_check_files="$_grub_check_files /boot/grub2/grub.cfg"
+              elif [ -f /boot/grub/grub.cfg ]; then
+                  _grub_check_files="$_grub_check_files /boot/grub/grub.cfg"
+              fi
+              if grep -q "nvme_core.io_timeout=240" $_grub_check_files 2>/dev/null; then
                   echo "[INFO] nvme_core.io_timeout is set to 240."
                   echo "[DRYRUN] nvme_core.io_timeout already set to 240. No grub changes needed."
                   echo "nvme_core_io_timeout=240" > "$staging_dir/modified/nvme-timeout-status.txt"
@@ -1624,18 +1631,31 @@ const DEFAULT_TEST_YAML = String.raw`---
                   echo "[DRYRUN] Staging grub changes..."
                   local grub_file=""
                   [ -f /etc/default/grub ] && grub_file="/etc/default/grub"
-                  [ -z "$grub_file" ] && [ -f /etc/default/grub.conf ] && grub_file="/etc/default/grub.conf"
                   if [ -n "$grub_file" ]; then
                       cp "$grub_file" "$staging_dir/original/grub"
                       cp "$grub_file" "$staging_dir/modified/grub"
                       case "$distro" in
                           ubuntu|debian) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          suse|sles|opensuse*) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
                           ol) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
                           *) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
                       esac
                       diff -u "$staging_dir/original/grub" "$staging_dir/modified/grub" > "$staging_dir/diffs/grub.diff" 2>&1 || true
                       echo "[DRYRUN] Grub diff staged in $staging_dir/diffs/grub.diff"
                       cat "$staging_dir/diffs/grub.diff"
+                      # Check for BLS (BootLoaderSpec) — RHEL 8+, AlmaLinux 8+, OL 8.10+
+                      if grep -q "GRUB_ENABLE_BLSCFG=true" "$grub_file" 2>/dev/null; then
+                          echo "[INFO] BLS (BootLoaderSpec) is enabled."
+                          if command -v grubby &>/dev/null; then
+                              echo "[DRYRUN] Would run: grubby --update-kernel=ALL --args=nvme_core.io_timeout=240"
+                              echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                              echo "grubby_available=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                          else
+                              echo "[WARNING] BLS is enabled but grubby is not installed."
+                              echo "bls_enabled=true" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                              echo "grubby_available=false" >> "$staging_dir/modified/nvme-timeout-status.txt"
+                          fi
+                      fi
                   else
                       echo "[DRYRUN] No grub config found to stage."
                   fi
@@ -1644,6 +1664,9 @@ const DEFAULT_TEST_YAML = String.raw`---
 
           check_fstab() {
               echo "[INFO] Checking /etc/fstab for deprecated device names..."
+              # NOTE: /dev/mapper/* (LVM) and PARTUUID= paths survive NVMe conversion
+              # because they use UUID-based addressing underneath. Only /dev/sd* and
+              # /dev/disk/azure/scsi* paths break when disks move from SCSI to NVMe.
               if grep -Eq '/dev/sd[a-z][0-9]*|/dev/disk/azure/scsi[0-9]*/lun[0-9]*' /etc/fstab; then
                   echo "[WARNING] /etc/fstab contains deprecated device names."
                   echo "[DRYRUN] Staging fstab changes..."
