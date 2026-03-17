@@ -7,15 +7,15 @@ End-to-end testing workflow for Azure SCSI-to-NVMe conversion — from fleet-wid
 The conversion process follows three phases. Each phase must pass before proceeding to the next.
 
 ```
-Phase 1: Dry-Run Assessment          Phase 2: Apply OS Fixes          Phase 3: VM Conversion
-┌─────────────────────────┐    ┌──────────────────────────┐    ┌─────────────────────────────┐
-│ Ansible playbook or     │    │ Re-run playbook with     │    │ Azure-NVMe-Conversion.ps1   │
-│ standalone script runs  │    │ fix mode (or manual)     │    │ per-VM: resize + controller │
-│ checks on all hosts     │──▷ │ to rebuild initramfs,    │──▷ │ type change, with OS checks │
-│                         │    │ update grub, fix fstab   │    │ and optional -DryRun         │
-│ Output: results.json    │    │                          │    │                              │
-│ + HTML report           │    │ Re-validate until clean  │    │ Loop over all VMs in RG     │
-└─────────────────────────┘    └──────────────────────────┘    └─────────────────────────────┘
+Phase 1: Dry-Run Assessment        Phase 2: Apply OS Fixes        Phase 3: VM Conversion
++-------------------------+    +---------------------------+    +------------------------------+
+| Ansible playbook or     |    | Re-run playbook with      |    | Azure-NVMe-Conversion.ps1    |
+| standalone script runs  |    | fix mode (or manual)      |    | per-VM: resize + controller  |
+| checks on all hosts     |--->| to rebuild initramfs,     |--->| type change, with OS checks  |
+|                         |    | update grub, fix fstab    |    | and optional -DryRun         |
+| Output: results.json    |    |                           |    |                              |
+| + HTML report           |    | Re-validate until clean   |    | Loop over all VMs in RG      |
++-------------------------+    +---------------------------+    +------------------------------+
 ```
 
 ---
@@ -131,14 +131,14 @@ Once all hosts pass dry-run validation (Phase 1 clean), execute the actual SCSI-
 
 ### Convert All VMs in a Resource Group
 
-Use `ForEach-Object -Parallel` to process VMs concurrently (PowerShell 7+):
+Run conversions in parallel using background jobs (works on PowerShell 5.1+):
 
 ```powershell
 # Define parameters
 $ResourceGroup = "myRG"
 $NewVMSize     = "Standard_E2bds_v5"   # Target NVMe-capable size
 $Controller    = "NVMe"
-$ThrottleLimit = 10                     # Max concurrent VMs
+$ThrottleLimit = 10                     # Max concurrent jobs
 
 # Get all VMs in the resource group
 $vms = Get-AzVM -ResourceGroupName $ResourceGroup
@@ -146,59 +146,52 @@ $vms = Get-AzVM -ResourceGroupName $ResourceGroup
 Write-Host "Found $($vms.Count) VMs in resource group '$ResourceGroup'" -ForegroundColor Cyan
 
 # Dry-run first (recommended) — validates without converting, runs in parallel
-$vms | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
-    Write-Host "=== DRY-RUN: $($_.Name) ===" -ForegroundColor Yellow
-    .\Azure-NVMe-Conversion.ps1 `
-        -ResourceGroupName $using:ResourceGroup `
-        -VMName $_.Name `
-        -NewControllerType $using:Controller `
-        -VMSize $using:NewVMSize `
-        -DryRun -WriteLogfile
+$jobs = @()
+foreach ($vm in $vms) {
+    # Throttle: wait if we already have $ThrottleLimit running jobs
+    while (($jobs | Where-Object { $_.State -eq 'Running' }).Count -ge $ThrottleLimit) {
+        Start-Sleep -Seconds 2
+    }
+    $jobs += Start-Job -ScriptBlock {
+        param($RG, $Name, $Ctrl, $Size)
+        Set-Location $using:PWD
+        .\Azure-NVMe-Conversion.ps1 `
+            -ResourceGroupName $RG `
+            -VMName $Name `
+            -NewControllerType $Ctrl `
+            -VMSize $Size `
+            -DryRun -WriteLogfile
+    } -ArgumentList $ResourceGroup, $vm.Name, $Controller, $NewVMSize
+    Write-Host "=== DRY-RUN started: $($vm.Name) ===" -ForegroundColor Yellow
 }
+# Wait for all jobs and collect output
+$jobs | Wait-Job | Receive-Job
+$jobs | Remove-Job
 
 # When dry-run is clean, execute the actual conversion in parallel
-$vms | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
-    Write-Host "=== CONVERTING: $($_.Name) ===" -ForegroundColor Green
-    .\Azure-NVMe-Conversion.ps1 `
-        -ResourceGroupName $using:ResourceGroup `
-        -VMName $_.Name `
-        -NewControllerType $using:Controller `
-        -VMSize $using:NewVMSize `
-        -FixOperatingSystemSettings `
-        -StartVM -WriteLogfile
+$jobs = @()
+foreach ($vm in $vms) {
+    while (($jobs | Where-Object { $_.State -eq 'Running' }).Count -ge $ThrottleLimit) {
+        Start-Sleep -Seconds 2
+    }
+    $jobs += Start-Job -ScriptBlock {
+        param($RG, $Name, $Ctrl, $Size)
+        Set-Location $using:PWD
+        .\Azure-NVMe-Conversion.ps1 `
+            -ResourceGroupName $RG `
+            -VMName $Name `
+            -NewControllerType $Ctrl `
+            -VMSize $Size `
+            -FixOperatingSystemSettings `
+            -StartVM -WriteLogfile
+    } -ArgumentList $ResourceGroup, $vm.Name, $Controller, $NewVMSize
+    Write-Host "=== CONVERTING started: $($vm.Name) ===" -ForegroundColor Green
 }
+$jobs | Wait-Job | Receive-Job
+$jobs | Remove-Job
 ```
 
-> **Note:** `ForEach-Object -Parallel` requires PowerShell 7+. Each parallel runspace creates its own Azure context, so ensure `Connect-AzAccount` has been run in the session. Adjust `-ThrottleLimit` based on Azure API rate limits and subscription quotas (10 is a safe default).
-
-### Convert VMs with Per-VM Size Mapping
-
-If different VMs need different target sizes:
-
-```powershell
-$ResourceGroup = "myRG"
-$ThrottleLimit = 10
-
-# Define size mapping per VM (or use a CSV)
-$vmSizeMap = @{
-    "sapvm01" = "Standard_E2bds_v5"
-    "sapvm02" = "Standard_E2bds_v5"
-    "sapvm03" = "Standard_E2bds_v5"
-}
-
-$vmSizeMap.GetEnumerator() | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
-    $vmName    = $_.Key
-    $targetSize = $_.Value
-    Write-Host "=== CONVERTING: $vmName -> $targetSize ===" -ForegroundColor Green
-    .\Azure-NVMe-Conversion.ps1 `
-        -ResourceGroupName $using:ResourceGroup `
-        -VMName $vmName `
-        -NewControllerType NVMe `
-        -VMSize $targetSize `
-        -FixOperatingSystemSettings `
-        -StartVM -WriteLogfile
-}
-```
+> **Note:** Each background job inherits the current Azure context. Ensure `Connect-AzAccount` has been run before starting. Adjust `$ThrottleLimit` based on Azure API rate limits and subscription quotas (10 is a safe default). Log files are written per-VM via `-WriteLogfile`.
 
 ### Key Parameters
 
@@ -222,12 +215,14 @@ $vmSizeMap.GetEnumerator() | ForEach-Object -ThrottleLimit $ThrottleLimit -Paral
 |---|---|
 | `nvme-dryrun-playbook.yml` | Self-contained Ansible playbook — runs dry-run assessment and produces JSON + HTML reports |
 | `nvme-check-dryrun.sh` | Standalone bash script — supports check, fix, and dry-run modes via `-fix` and `-dry` flags |
+| `nvme-postconversion-check.yml` | Ansible playbook — post-conversion verification (IMDS + lsblk), produces `post.json` |
 | `scsi2nvme-tester.html` | Browser-based ARM template builder for deploying a test lab in Azure |
-| `results.json` | Sample output from a 39-host dry-run assessment (Gen2 x64 only) |
+| `results.json` | Sample output from a 41-host dry-run assessment (Gen2 x64 only) |
+| `post.json` | Post-conversion verification — 41 hosts, all confirmed booting on NVMe |
 
 ## Tested VM Images
 
-The following 39 Azure Marketplace images (x64, Gen2 only) were validated in the dry-run assessment. All returned `ready=true` with zero errors and zero stderr noise.
+The following 41 Azure Marketplace images (x64, Gen2 only) were validated in the dry-run assessment and post-conversion verification. All 41 VMs converted successfully to NVMe and boot on `nvme0n1`.
 
 ### AlmaLinux (3 images)
 
@@ -256,8 +251,8 @@ The following 39 Azure Marketplace images (x64, Gen2 only) were validated in the
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
-| oracle-linux-ol79-gen2-x64-gen2-latest | 7.9 | 5.4.17-2036.101.2.el7uek.x86_64 | Yes — grub |
-| oracle-linux-ol82-gen2-x64-gen2-latest | 8.2 | 5.4.17-2011.4.6.el8uek.x86_64 | Yes — initramfs, grub |
+| oracle-linux-ol79-gen2-x64-gen2-latest | 7.9 | 5.4.17-2036.101.2.el7uek.x86_64 | Yes — initramfs (pci-hyperv), grub |
+| oracle-linux-ol82-gen2-x64-gen2-latest | 8.2 | 5.4.17-2011.4.6.el8uek.x86_64 | Yes — initramfs (nvme + pci-hyperv), grub |
 | oracle-linux-ol810-lvm-gen2-x64-gen2-latest | 8.10 | 5.15.0-317.197.5.1.el8uek.x86_64 | Yes — grub, grubby (BLS) |
 | oracle-linux-ol95-lvm-gen2-x64-gen2-latest | 9.5 | 5.15.0-307.178.5.el9uek.x86_64 | Yes — grub, grubby (BLS) |
 | oracle-linux-ol10-lvm-gen2-x64-gen2-latest | 10.0 | 6.12.0-104.43.4.3.el10uek.x86_64 | Yes — grub, grubby (BLS) |
@@ -291,11 +286,13 @@ The following 39 Azure Marketplace images (x64, Gen2 only) were validated in the
 |---|---|---|---|
 | sles-sap-15-sp7-gen2-x64-gen2 | 15.7 | 6.4.0-150700.53.28-default | No |
 
-### Ubuntu (12 images)
+### Ubuntu (14 images)
 
 | Hostname | Version | Kernel | Needs Changes |
 |---|---|---|---|
+| 0001-com-ubuntu-minimal-focal-minimal-20-04-lts-gen2-x64-gen2-la | 20.04 | 5.15.0-1089-azure | No |
 | 0001-com-ubuntu-server-focal-20-04-lts-gen2-x64-gen2-latest | 20.04 | 5.15.0-1089-azure | No |
+| 0001-com-ubuntu-minimal-jammy-minimal-22-04-lts-gen2-x64-gen2-la | 22.04 | 6.8.0-1044-azure | No |
 | 0001-com-ubuntu-server-jammy-22-04-lts-gen2-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
 | ubuntu-22-04-lts-server-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
 | ubuntu-22-04-lts-ubuntu-minimal-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
@@ -319,10 +316,10 @@ The following 39 Azure Marketplace images (x64, Gen2 only) were validated in the
 | RHEL | 9 | 9 | 3 | 3 |
 | SLES | 4 | 4 | 1 | 0 |
 | SLES SAP | 1 | 1 | 0 | 0 |
-| Ubuntu | 12 | 12 | 0 | 0 |
-| **Total** | **39** | **39** | **12** | **6** |
+| Ubuntu | 14 | 14 | 0 | 0 |
+| **Total** | **41** | **41** | **12** | **6** |
 
-> All 39 images returned `ready=true` (exit code 0) with zero stderr. The 12 that need changes require `nvme_core.io_timeout=240` in grub (and/or initramfs rebuild). Of those, 6 also have BLS enabled and need `grubby --update-kernel=ALL` — all fixable via Phase 2. 2 hosts were unreachable (41 targeted, 39 responded). The FIPS image (`ubuntu-22-04-lts-ubuntu-pro-fips-x64-gen2-latest`) was excluded from this run.
+> **41 of 41 VMs converted successfully to NVMe** with zero boot failures. The 12 that needed changes had `nvme_core.io_timeout=240` added to grub (and/or initramfs rebuilt with `pci-hyperv`) automatically via `-FixOperatingSystemSettings`. Of those, 6 also had BLS enabled and used `grubby --update-kernel=ALL`. **OL 7.9 (UEK 5.4.17)** required both `pci-hyperv` addition to initramfs and `nvme_core.io_timeout=240` in grub — the script now detects and fixes this automatically. Post-conversion verification via `post.json` confirmed all 41 hosts boot on `nvme0n1` with OS disk mounted correctly.
 
 ---
 

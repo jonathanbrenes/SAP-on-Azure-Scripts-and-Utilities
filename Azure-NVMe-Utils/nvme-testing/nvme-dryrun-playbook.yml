@@ -69,30 +69,52 @@
               echo "[INFO] NVMe is not built-in. Checking initrd/initramfs..."
               case "$distro" in
                   ubuntu|debian)
-                      if lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -q nvme; then
+                      _initramfs_ok=true
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -q nvme; then
+                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
+                          _initramfs_ok=false
+                      fi
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                          echo "[WARNING] pci-hyperv/hv_pci driver not found in initrd/initramfs (required for Azure NVMe)."
+                          _initramfs_ok=false
+                      fi
+                      if $_initramfs_ok; then
                           echo "[INFO] NVMe driver found in initrd/initramfs."
-                          echo "[DRYRUN] NVMe driver already in initramfs. No changes needed."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in initramfs. No changes needed."
                           echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
                           echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
                       else
-                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
-                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in the initramfs."
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk."
                           echo "[DRYRUN] Would run: update-initramfs -u -k all"
                           echo "update-initramfs -u -k all" > "$staging_dir/modified/initramfs-commands.txt"
                       fi
                       ;;
                   redhat|rhel|centos|rocky|almalinux|azurelinux|mariner|suse|sles|ol)
-                      if lsinitrd 2>/dev/null | grep -q nvme; then
-                          echo "[INFO] NVMe driver found in initrd/initramfs."
-                          echo "[DRYRUN] NVMe driver already in initramfs. No changes needed."
+                      # Fix 10: check ALL installed initramfs images, not just the running kernel
+                      _nvme_missing=false
+                      for _img in /boot/initramfs-*.img; do
+                          [ -f "$_img" ] || continue
+                          [[ "$_img" == *kdump* ]] && continue
+                          [[ "$_img" == *rescue* ]] && continue
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -q nvme; then
+                              echo "[WARNING] NVMe driver not found in $_img"
+                              _nvme_missing=true
+                          fi
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                              echo "[WARNING] pci-hyperv/hv_pci driver not found in $_img (required for Azure NVMe)"
+                              _nvme_missing=true
+                          fi
+                      done
+                      if ! $_nvme_missing; then
+                          echo "[INFO] NVMe and pci-hyperv drivers found in initrd/initramfs."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in all initramfs images. No changes needed."
                           echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
                           echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
                       else
-                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
-                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in the initramfs."
-                          echo "[DRYRUN] Would run: dracut -f (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in all initramfs images."
+                          echo "[DRYRUN] Would run: dracut -f --regenerate-all (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
                           echo 'add_drivers+=" nvme nvme-core pci-hyperv "' > "$staging_dir/modified/dracut-nvme.conf"
-                          echo "dracut -f" > "$staging_dir/modified/initramfs-commands.txt"
+                          echo "dracut -f --regenerate-all" > "$staging_dir/modified/initramfs-commands.txt"
                       fi
                       ;;
                   *) echo "[ERROR] Unsupported distribution for NVMe driver check."; return 1 ;;
@@ -212,12 +234,12 @@
     - name: Parse script output lines
       ansible.builtin.set_fact:
         nvme_result:
-          hostname: "{{ ansible_hostname }}"
-          fqdn: "{{ ansible_fqdn }}"
+          hostname: "{{ inventory_hostname }}"
+          fqdn: "{{ ansible_fqdn | default(inventory_hostname) }}"
           ip: "{{ ansible_default_ipv4.address | default('unknown') }}"
-          distro: "{{ ansible_distribution | lower }}"
-          distro_version: "{{ ansible_distribution_version }}"
-          kernel: "{{ ansible_kernel }}"
+          distro: "{{ ansible_distribution | default('unknown') | lower }}"
+          distro_version: "{{ ansible_distribution_version | default('unknown') }}"
+          kernel: "{{ ansible_kernel | default('unknown') }}"
           exit_code: "{{ dryrun_output.rc }}"
           errors: "{{ dryrun_output.stdout_lines | select('search', '\\[ERROR\\]') | list }}"
           warnings: "{{ dryrun_output.stdout_lines | select('search', '\\[WARNING\\]') | list }}"
@@ -287,7 +309,7 @@
     - name: Debug per-host result
       ansible.builtin.debug:
         msg: >-
-          {{ ansible_hostname }}: ready={{ nvme_result.ready }}
+          {{ inventory_hostname }}: ready={{ nvme_result.ready }}
           errors={{ nvme_result.error_count }}
           warnings={{ nvme_result.warning_count }}
       when: nvme_result is defined

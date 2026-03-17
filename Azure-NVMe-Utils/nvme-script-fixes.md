@@ -22,13 +22,13 @@
 | 5 | HIGH | `azurelinux` not in case statements | ✅ Done | Added as `azurelinux\|mariner` to both functions |
 | 6 | MEDIUM | BLS systems need `grubby` | ✅ Done | `grubby --update-kernel=ALL --args=...` added after grub2-mkconfig for RHEL and OL when BLS enabled |
 | 7 | MEDIUM | Verification grep checks non-existent files | ✅ Done | Dynamic `_grub_check_files` variable + `2>/dev/null`; removed hardcoded `/etc/grub.conf` and `/boot/grub/grub.cfg` |
-| 8 | MEDIUM | OL 7.9/8.2 dracut gap | ✅ Done | `pci-hyperv` added alongside `nvme nvme-core` in dracut config |
+| 8 | MEDIUM | OL 7.9/8.2 dracut gap | ✅ Done | `pci-hyperv` check added to initramfs verification loop + dracut config; skip `*rescue*` images |
 | 9 | MEDIUM | `/etc/default/grub.conf` fallback is dead code | ✅ Done | Removed all `elif [ -f /etc/default/grub.conf ]` branches |
-| 10 | LOW | `lsinitrd` checks only default kernel | ⏭️ Deferred | Low risk — dracut -f also only rebuilds current kernel |
+| 10 | LOW | `lsinitrd` checks only default kernel | ✅ Done | Loop all /boot/initramfs-*.img (skip *kdump* and *rescue*); dracut -f --regenerate-all |
 | 11 | LOW | fstab check does not flag LVM paths | ✅ Done | Added comment explaining `/dev/mapper/*` and `PARTUUID=` are safe |
 | 12 | LOW | Inconsistent `sudo` usage | ✅ Done | Removed all `sudo` prefixes — script runs as root via `Invoke-AzVMRunCommand` |
 
-**Dry-run test results (2026-03-17, run 2 — with BLS detection):** 39 of 41 Gen2 x64 VMs returned `ready=true` with zero errors and zero stderr. 12 need grub changes (`nvme_core.io_timeout=240`), of which 6 also have BLS enabled and need `grubby --update-kernel=ALL`. 2 hosts were unreachable. All Fix 7 stderr noise confirmed resolved.
+**Dry-run test results (2026-03-17, run 3 — with pci-hyperv check + rescue exclusion):** 41 of 41 Gen2 x64 VMs converted to NVMe and boot successfully. 12 needed grub changes (`nvme_core.io_timeout=240`), of which 6 also have BLS enabled. OL 7.9 (UEK 5.4.17) now succeeds — `pci-hyperv` was missing from initramfs and is now detected and added automatically. Post-conversion verification (`post.json`) confirmed all 41 hosts boot on `nvme0n1`.
 
 ---
 

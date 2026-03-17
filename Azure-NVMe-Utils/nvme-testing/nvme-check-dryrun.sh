@@ -95,24 +95,32 @@ check_nvme_driver() {
     echo "[INFO] NVMe is not built-in. Checking initrd/initramfs..."
     case "$distro" in
         ubuntu|debian)
-            if lsinitramfs /boot/initrd.img-* | grep -q nvme; then
+            _initramfs_ok=true
+            if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -q nvme; then
+                echo "[WARNING] NVMe driver not found in initrd/initramfs."
+                _initramfs_ok=false
+            fi
+            if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                echo "[WARNING] pci-hyperv/hv_pci driver not found in initrd/initramfs (required for Azure NVMe)."
+                _initramfs_ok=false
+            fi
+            if $_initramfs_ok; then
                 echo "[INFO] NVMe driver found in initrd/initramfs."
                 if $dry_run && $fix; then
-                    echo "[DRYRUN] NVMe driver already in initramfs. No changes needed."
+                    echo "[DRYRUN] NVMe and pci-hyperv drivers already in initramfs. No changes needed."
                     echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
                     echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
                 fi
             else
-                echo "[WARNING] NVMe driver not found in initrd/initramfs."
                 if modinfo nvme &>/dev/null; then
-                    echo "[INFO] NVMe module exists on disk but is not in the initramfs."
+                    echo "[INFO] NVMe module exists on disk."
                 fi
                 if $fix; then
                     if $dry_run; then
                         echo "[DRYRUN] Would run: update-initramfs -u -k all"
                         echo "update-initramfs -u -k all" > "$staging_dir/modified/initramfs-commands.txt"
                     else
-                        echo "[INFO] Adding NVMe driver to initrd/initramfs..."
+                        echo "[INFO] Adding NVMe/pci-hyperv drivers to initrd/initramfs..."
                         update-initramfs -u -k all
                         if lsinitramfs /boot/initrd.img-* | grep -q nvme; then
                             echo "[INFO] NVMe driver added successfully."
@@ -126,32 +134,60 @@ check_nvme_driver() {
             fi
             ;;
         redhat|rhel|centos|rocky|almalinux|azurelinux|mariner|suse|sles|ol)
-            if lsinitrd | grep -q nvme; then
-                echo "[INFO] NVMe driver found in initrd/initramfs."
+            # Fix 10: check ALL installed initramfs images, not just the running kernel
+            _nvme_missing=false
+            for _img in /boot/initramfs-*.img; do
+                [ -f "$_img" ] || continue
+                [[ "$_img" == *kdump* ]] && continue
+                [[ "$_img" == *rescue* ]] && continue
+                if ! lsinitrd "$_img" 2>/dev/null | grep -q nvme; then
+                    echo "[WARNING] NVMe driver not found in $_img"
+                    _nvme_missing=true
+                fi
+                if ! lsinitrd "$_img" 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                    echo "[WARNING] pci-hyperv/hv_pci driver not found in $_img (required for Azure NVMe)"
+                    _nvme_missing=true
+                fi
+            done
+            if ! $_nvme_missing; then
+                echo "[INFO] NVMe and pci-hyperv drivers found in initrd/initramfs."
                 if $dry_run && $fix; then
-                    echo "[DRYRUN] NVMe driver already in initramfs. No changes needed."
+                    echo "[DRYRUN] NVMe and pci-hyperv drivers already in all initramfs images. No changes needed."
                     echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
                     echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
                 fi
             else
-                echo "[WARNING] NVMe driver not found in initrd/initramfs."
                 if modinfo nvme &>/dev/null; then
-                    echo "[INFO] NVMe module exists on disk but is not in the initramfs."
+                    echo "[INFO] NVMe module exists on disk but is not in all initramfs images."
                 fi
                 if $fix; then
                     if $dry_run; then
-                        echo "[DRYRUN] Would run: dracut -f (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
+                        echo "[DRYRUN] Would run: dracut -f --regenerate-all (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
                         echo 'add_drivers+=" nvme nvme-core pci-hyperv "' > "$staging_dir/modified/dracut-nvme.conf"
-                        echo "dracut -f" >> "$staging_dir/modified/initramfs-commands.txt"
+                        echo "dracut -f --regenerate-all" >> "$staging_dir/modified/initramfs-commands.txt"
                     else
-                        echo "[INFO] Adding NVMe driver to initrd/initramfs..."
+                        echo "[INFO] Adding NVMe driver to initrd/initramfs (all kernels)..."
                         mkdir -p /etc/dracut.conf.d
                         echo 'add_drivers+=" nvme nvme-core pci-hyperv "' | tee /etc/dracut.conf.d/nvme.conf > /dev/null
-                        dracut -f
-                        if lsinitrd | grep -q nvme; then
+                        dracut -f --regenerate-all
+                        _verify_ok=true
+                        for _img in /boot/initramfs-*.img; do
+                            [ -f "$_img" ] || continue
+                            [[ "$_img" == *kdump* ]] && continue
+                            [[ "$_img" == *rescue* ]] && continue
+                            if ! lsinitrd "$_img" 2>/dev/null | grep -q nvme; then
+                                echo "[ERROR] NVMe driver still missing in $_img after rebuild."
+                                _verify_ok=false
+                            fi
+                            if ! lsinitrd "$_img" 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                                echo "[ERROR] pci-hyperv/hv_pci driver still missing in $_img after rebuild."
+                                _verify_ok=false
+                            fi
+                        done
+                        if $_verify_ok; then
                             echo "[INFO] NVMe driver added successfully."
                         else
-                            echo "[ERROR] Failed to add NVMe driver to initrd/initramfs."
+                            echo "[ERROR] Failed to add NVMe driver to all initramfs images."
                         fi
                     fi
                 else

@@ -119,7 +119,7 @@
         <div id="sshKeyError" class="error-text"></div>
       </div>
       <div style="margin-top:12px;">
-        <label for="testYaml">Test Playbook YAML (saved to /root/tests.yml on control VM)</label>
+        <label for="testYaml">Test Playbook YAML (saved to /home/ansible/test.yml on control VM)</label>
         <div class="textarea-wrap">
           <button id="expandYamlBtn" class="textarea-expand-btn" title="Maximize YAML" type="button">&#x26F6;</button>
           <textarea id="testYaml" style="min-height:200px;" placeholder="---
@@ -1101,6 +1101,7 @@ async function generateTemplate(sshKey, testYaml, regionPlans) {
 
   const safeYaml = String(testYaml || '').replace(/\r\n/g, '\n');
   const yamlB64 = await gzipToBase64(safeYaml);
+  const postconvB64 = await gzipToBase64(POSTCONVERSION_YAML);
 
   // Index HTML for control VM
   const indexHtml = `<!DOCTYPE html>
@@ -1159,6 +1160,8 @@ __SCRIPT_END__</div></body></html>`
     `cat <<'INV_EOF' > /etc/ansible/hosts\n[VMs]\n${inventoryHosts}\nINV_EOF`,
     `echo '${yamlB64}' | base64 -d | gunzip > /home/ansible/test.yml`,
     'chown ansible /home/ansible/test.yml',
+    `echo '${postconvB64}' | base64 -d | gunzip > /home/ansible/postconversion-check.yml`,
+    'chown ansible /home/ansible/postconversion-check.yml',
     `cat <<'HTML_EOF' > /var/www/html/index.html\n${indexHtml}\nHTML_EOF`,
     `cat <<'WAITER_EOF' > /home/ansible/run-test.sh\n#!/bin/bash\nVM_COUNT=$(ansible --list-hosts VMs 2>/dev/null | tail -n +2 | grep -c '[^[:space:]]')\nMAX_WAIT=1800\nELAPSED=0\nsudo tee /var/www/html/index.html > /dev/null <<'HOLDER'\n<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SCSI-to-NVMe - Waiting</title>\n<style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:#201f1e}\n.c{text-align:center;background:#fff;padding:40px 48px;border-radius:12px;border:1px solid #edebe9;box-shadow:0 2px 8px rgba(0,0,0,.08)}\nh1{color:#0078d4;margin:0 0 8px;font-size:22px}p{color:#605e5c;margin:4px 0;font-size:14px}\n.spin{display:inline-block;width:28px;height:28px;border:3px solid #edebe9;border-top-color:#0078d4;border-radius:50%;animation:s .8s linear infinite;margin-bottom:12px}@keyframes s{to{transform:rotate(360deg)}}</style></head>\n<body><div class="c"><div class="spin"></div><h1>Playbook has not run yet</h1><p>Waiting for all VMs to respond to ping&hellip;</p><p id="st">0 / __VM_COUNT__ VMs online &mdash; elapsed 0s</p><p style="font-size:12px;color:#a0a0a0;margin-top:16px;">This page auto-refreshes every 30 seconds.</p></div></body></html>\nHOLDER\nsudo sed -i "s|__VM_COUNT__|$VM_COUNT|g" /var/www/html/index.html\nwhile [ $ELAPSED -lt $MAX_WAIT ]; do\n  OK=$(ansible -m ping VMs -f 30 -o 2>/dev/null | grep -c SUCCESS)\n  ELAPSED=$((ELAPSED + 15))\n  sudo sed -i "s|<p id=\\"st\\">[^<]*</p>|<p id=\\"st\\">$OK / $VM_COUNT VMs online \\&mdash; elapsed ${'${'}ELAPSED}s</p>|" /var/www/html/index.html 2>/dev/null\n  if [ "$OK" -ge "$VM_COUNT" ] && [ "$VM_COUNT" -gt 0 ]; then\n    sudo sed -i "s|<h1>[^<]*</h1>|<h1>Test playbook running\\&hellip;</h1>|;s|<p>Waiting[^<]*</p>|<p>All $VM_COUNT VMs online. Executing ansible-playbook test.yml</p>|;s|<p id=\\"st\\">[^<]*</p>|<p id=\\"st\\">Started at $(date -u +%H:%M:%S) UTC</p>|" /var/www/html/index.html 2>/dev/null\n    ansible-playbook -f 30 /home/ansible/test.yml 2>&1 | tee /home/ansible/test-run.log\n    exit 0\n  fi\n  sleep 15\ndone\necho "Timed out waiting for all VMs after ${'${'}MAX_WAIT}s" > /home/ansible/test-run.log\nWAITER_EOF`,
     'chown ansible:ansible /home/ansible/run-test.sh',
@@ -1584,29 +1587,51 @@ const DEFAULT_TEST_YAML = String.raw`---
               echo "[INFO] NVMe is not built-in. Checking initrd/initramfs..."
               case "$distro" in
                   ubuntu|debian)
-                      if lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -q nvme; then
+                      _initramfs_ok=true
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -q nvme; then
+                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
+                          _initramfs_ok=false
+                      fi
+                      if ! lsinitramfs /boot/initrd.img-* 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                          echo "[WARNING] pci-hyperv/hv_pci driver not found in initrd/initramfs (required for Azure NVMe)."
+                          _initramfs_ok=false
+                      fi
+                      if $_initramfs_ok; then
                           echo "[INFO] NVMe driver found in initrd/initramfs."
-                          echo "[DRYRUN] NVMe driver already in initramfs. No changes needed."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in initramfs. No changes needed."
                           echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
                           echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
                       else
-                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
-                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in the initramfs."
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk."
                           echo "[DRYRUN] Would run: update-initramfs -u -k all"
                           echo "update-initramfs -u -k all" > "$staging_dir/modified/initramfs-commands.txt"
                       fi ;;
                   redhat|rhel|centos|rocky|almalinux|azurelinux|mariner|suse|sles|ol)
-                      if lsinitrd 2>/dev/null | grep -q nvme; then
-                          echo "[INFO] NVMe driver found in initrd/initramfs."
-                          echo "[DRYRUN] NVMe driver already in initramfs. No changes needed."
+                      # Fix 10: check ALL installed initramfs images, not just the running kernel
+                      _nvme_missing=false
+                      for _img in /boot/initramfs-*.img; do
+                          [ -f "$_img" ] || continue
+                          [[ "$_img" == *kdump* ]] && continue
+                          [[ "$_img" == *rescue* ]] && continue
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -q nvme; then
+                              echo "[WARNING] NVMe driver not found in $_img"
+                              _nvme_missing=true
+                          fi
+                          if ! lsinitrd "$_img" 2>/dev/null | grep -qE 'hv_pci|pci.hyperv'; then
+                              echo "[WARNING] pci-hyperv/hv_pci driver not found in $_img (required for Azure NVMe)"
+                              _nvme_missing=true
+                          fi
+                      done
+                      if ! $_nvme_missing; then
+                          echo "[INFO] NVMe and pci-hyperv drivers found in initrd/initramfs."
+                          echo "[DRYRUN] NVMe and pci-hyperv drivers already in all initramfs images. No changes needed."
                           echo "nvme_in_initramfs=true" > "$staging_dir/modified/nvme-driver-status.txt"
                           echo "kernel=$(uname -r)" >> "$staging_dir/modified/nvme-driver-status.txt"
                       else
-                          echo "[WARNING] NVMe driver not found in initrd/initramfs."
-                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in the initramfs."
-                          echo "[DRYRUN] Would run: dracut -f"
+                          modinfo nvme &>/dev/null && echo "[INFO] NVMe module exists on disk but is not in all initramfs images."
+                          echo "[DRYRUN] Would run: dracut -f --regenerate-all (with nvme nvme-core in /etc/dracut.conf.d/nvme.conf)"
                           echo 'add_drivers+=" nvme nvme-core pci-hyperv "' > "$staging_dir/modified/dracut-nvme.conf"
-                          echo "dracut -f" > "$staging_dir/modified/initramfs-commands.txt"
+                          echo "dracut -f --regenerate-all" > "$staging_dir/modified/initramfs-commands.txt"
                       fi ;;
                   *) echo "[ERROR] Unsupported distribution for NVMe driver check."; return 1 ;;
               esac
@@ -1727,12 +1752,12 @@ const DEFAULT_TEST_YAML = String.raw`---
     - name: Parse script output lines
       ansible.builtin.set_fact:
         nvme_result:
-          hostname: "{{ ansible_hostname }}"
-          fqdn: "{{ ansible_fqdn }}"
+          hostname: "{{ inventory_hostname }}"
+          fqdn: "{{ ansible_fqdn | default(inventory_hostname) }}"
           ip: "{{ ansible_default_ipv4.address | default('unknown') }}"
-          distro: "{{ ansible_distribution | lower }}"
-          distro_version: "{{ ansible_distribution_version }}"
-          kernel: "{{ ansible_kernel }}"
+          distro: "{{ ansible_distribution | default('unknown') | lower }}"
+          distro_version: "{{ ansible_distribution_version | default('unknown') }}"
+          kernel: "{{ ansible_kernel | default('unknown') }}"
           exit_code: "{{ dryrun_output.rc }}"
           errors: "{{ dryrun_output.stdout_lines | select('search', '\\[ERROR\\]') | list }}"
           warnings: "{{ dryrun_output.stdout_lines | select('search', '\\[WARNING\\]') | list }}"
@@ -1797,7 +1822,7 @@ const DEFAULT_TEST_YAML = String.raw`---
     - name: Debug per-host result
       ansible.builtin.debug:
         msg: >-
-          {{ ansible_hostname }}: ready={{ nvme_result.ready }}
+          {{ inventory_hostname }}: ready={{ nvme_result.ready }}
           errors={{ nvme_result.error_count }}
           warnings={{ nvme_result.warning_count }}
       when: nvme_result is defined
@@ -1984,6 +2009,223 @@ const DEFAULT_TEST_YAML = String.raw`---
           </html>
 `.replace('__SCRIPT_END__', '<' + '/script>');
 
+const DEFAULT_POSTCONVERSION_YAML = String.raw`---
+# =============================================================================
+# Post-NVMe Conversion Verification Playbook
+# Collects IMDS VM SKU metadata and lsblk output from all hosts
+# to verify NVMe conversion was successful.
+# Output: /var/www/html/results.json + /var/www/html/index.html
+# =============================================================================
+
+- name: Post-NVMe Conversion Verification
+  hosts: VMs
+  become: true
+  gather_facts: false
+  any_errors_fatal: false
+
+  tasks:
+
+    - name: Query IMDS for VM SKU metadata
+      ansible.builtin.uri:
+        url: "http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01"
+        method: GET
+        headers:
+          Metadata: "true"
+        return_content: true
+        timeout: 10
+      register: imds_raw
+
+    - name: Parse IMDS compute fields
+      ansible.builtin.set_fact:
+        imds:
+          vmSize: "{{ (imds_raw.content | from_json).vmSize | default('unknown') }}"
+          publisher: "{{ (imds_raw.content | from_json).storageProfile.imageReference.publisher | default('unknown') }}"
+          offer: "{{ (imds_raw.content | from_json).storageProfile.imageReference.offer | default('unknown') }}"
+          sku: "{{ (imds_raw.content | from_json).storageProfile.imageReference.sku | default('unknown') }}"
+          version: "{{ (imds_raw.content | from_json).storageProfile.imageReference.version | default('unknown') }}"
+          osType: "{{ (imds_raw.content | from_json).osType | default('unknown') }}"
+          name: "{{ (imds_raw.content | from_json).name | default('unknown') }}"
+          zone: "{{ (imds_raw.content | from_json).zone | default('') }}"
+
+    - name: Collect lsblk output
+      ansible.builtin.command: lsblk -o NAME,TYPE,SIZE,TRAN,MOUNTPOINT
+      register: lsblk_out
+      changed_when: false
+
+    - name: Determine NVMe presence
+      ansible.builtin.set_fact:
+        postconv_result:
+          hostname: "{{ inventory_hostname }}"
+          vm_name: "{{ imds.name }}"
+          vm_size: "{{ imds.vmSize }}"
+          image: "{{ imds.publisher }}:{{ imds.offer }}:{{ imds.sku }}:{{ imds.version }}"
+          os_type: "{{ imds.osType }}"
+          zone: "{{ imds.zone | default('') }}"
+          lsblk: "{{ lsblk_out.stdout }}"
+          has_nvme: "{{ 'nvme' in lsblk_out.stdout | lower }}"
+
+    - name: Show results per host
+      ansible.builtin.debug:
+        msg: |
+          VM: {{ imds.name }} | SKU: {{ imds.vmSize }} | NVMe: {{ postconv_result.has_nvme }}
+          {{ lsblk_out.stdout }}
+
+# =============================================================================
+# Second play: aggregate results into JSON + HTML on localhost
+# =============================================================================
+- name: Generate post-conversion report
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Find hosts with collected data
+      set_fact:
+        _collected: "{{ _collected | default([]) + [item] }}"
+      loop: "{{ groups['VMs'] | default(groups['all']) }}"
+      when: hostvars[item].postconv_result is defined
+      no_log: true
+
+    - name: Build combined report
+      set_fact:
+        combined_report:
+          _meta:
+            description: "Post-NVMe Conversion Verification - {{ _collected | default([]) | length }} hosts"
+            total_hosts: "{{ _collected | default([]) | length }}"
+            generated_at: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+          summary:
+            total: "{{ _collected | default([]) | length }}"
+            nvme_ok: "{{ _collected | default([]) | map('extract', hostvars, 'postconv_result') | selectattr('has_nvme') | list | length }}"
+            nvme_missing: "{{ _collected | default([]) | map('extract', hostvars, 'postconv_result') | rejectattr('has_nvme') | list | length }}"
+          hosts: "{{ dict(_collected | default([]) | zip(_collected | default([]) | map('extract', hostvars, 'postconv_result'))) }}"
+
+    - name: Ensure /var/www/html directory exists
+      file:
+        path: /var/www/html
+        state: directory
+
+    - name: Write /var/www/html/results.json
+      copy:
+        dest: /var/www/html/results.json
+        content: "{{ combined_report | to_nice_json }}"
+
+    - name: Generate post-conversion HTML report
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Post-NVMe Conversion Verification</title>
+          <style>
+          :root{--b:#edebe9;--t:#201f1e;--m:#605e5c;--p:#0078d4;--hb:#0078d4;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;--sans:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+          *{box-sizing:border-box}
+          body{margin:0;font:14px var(--sans);color:var(--t);background:#fff;-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh}
+          .hd{background:var(--hb);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px}
+          .hd h1{margin:0;font-size:16px;font-weight:800}
+          .hd .sp{flex:1}
+          .gb{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.45);border-radius:8px;padding:3px 6px;font-size:10px;font-weight:700;cursor:pointer;text-decoration:none}
+          .gb:hover{background:rgba(255,255,255,.22)}
+          .gb svg{width:14px;height:14px;fill:currentColor}
+          .app{display:flex;height:calc(100vh - 42px)}
+          .sb{width:300px;min-width:240px;border-right:1px solid var(--b);overflow-y:auto;background:#fafafa;flex-shrink:0}
+          .vi{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--b);font-size:12px;display:flex;flex-direction:column;gap:2px}
+          .vi:hover{background:#e8f0f8}
+          .vi.on{background:var(--p);color:#fff}
+          .vi.on .vm{color:rgba(255,255,255,.75)}
+          .vn{font-weight:700;font-size:12px}
+          .vm{color:var(--m);font-size:11px}
+          .vp{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}
+          .mn{flex:1;overflow-y:auto;padding:16px}
+          .pn{display:none}
+          .pn.on{display:block}
+          .pt{font-size:16px;font-weight:800;margin:0 0 4px}
+          .ps{font-size:13px;color:var(--m);margin:0 0 12px}
+          .sc{background:#fff;border:1px solid var(--b);border-radius:10px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);margin-top:12px}
+          .sc:first-child{margin-top:0}
+          .sc h4{font-size:13px;font-weight:900;margin:0 0 6px;color:var(--p);border-bottom:1px solid var(--b);padding-bottom:4px}
+          .kv{display:grid;grid-template-columns:150px 1fr;gap:1px 10px;font-size:12px;margin:4px 0}
+          .kv .k{font-weight:700;color:var(--m)}.kv .v{word-break:break-all}
+          pre.d{background:#f8f8f8;border:1px solid var(--b);border-radius:6px;padding:6px;font:11px/1.35 var(--mono);overflow-x:auto;max-height:400px;white-space:pre-wrap;margin:4px 0}
+          .pl{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:900;white-space:nowrap}
+          .pe{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+          .po{background:#ecfdf3;color:#155724;border:1px solid #b7e3c4}
+          .sum{margin:12px 0;padding:12px;background:#faf9f8;border:1px solid var(--b);border-radius:10px;font-size:13px}
+          .sum b{font-size:18px}
+          </style>
+          </head>
+          <body>
+          <div class="hd">
+            <h1>Post-NVMe Conversion Verification</h1>
+            <span class="sp"></span>
+            <a class="gb" href="results.json" download><svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-5 1h10v1H3v-1z"/></svg> JSON</a>
+          </div>
+
+          {# ── Summary ── #}
+          {% set all_rows = [] %}
+          {% set total = combined_report.hosts | length %}
+          {% set nvme_ok = combined_report.hosts.values() | selectattr('has_nvme') | list | length %}
+          {% set nvme_missing = total - nvme_ok %}
+
+          <div class="app">
+          <div class="sb" id="sb">
+          <div class="sum">
+            <b>{{ total }}</b> hosts verified<br>
+            <span class="pl po">{{ nvme_ok }} NVMe OK</span>
+            {% if nvme_missing > 0 %}<span class="pl pe">{{ nvme_missing }} Missing NVMe</span>{% endif %}
+          </div>
+          {% for sku, h in combined_report.hosts.items() | sort %}
+            {% set _ = all_rows.append({'sku': sku, 'h': h, 'idx': loop.index0}) %}
+            <div class="vi{% if loop.first %} on{% endif %}" onclick="showVM({{ loop.index0 }})" id="n{{ loop.index0 }}">
+              <span class="vn">{{ h.hostname | default(sku) }}</span>
+              <span class="vm">{{ h.vm_size | default('') }} &mdash; {{ h.image | default('') }}</span>
+              <span class="vp">
+                {% if h.has_nvme %}<span class="pl po">NVMe OK</span>{% else %}<span class="pl pe">No NVMe</span>{% endif %}
+              </span>
+            </div>
+          {% endfor %}
+          </div>
+
+          <div class="mn" id="mn">
+          {% for r in all_rows %}
+          {% set h = r.h %}
+          <div class="pn{% if loop.first %} on{% endif %}" id="v{{ r.idx }}">
+            <div class="pt">{{ h.hostname | default(r.sku) }}</div>
+            <div class="ps">{{ h.vm_size | default('') }} &mdash; {{ h.image | default('') }}{% if h.zone | default('') %} &mdash; Zone {{ h.zone }}{% endif %}</div>
+
+            <div class="sc"><h4>VM Info</h4>
+            <div class="kv">
+            <div class="k">VM Name</div><div class="v">{{ h.vm_name | default('') }}</div>
+            <div class="k">VM Size</div><div class="v">{{ h.vm_size | default('') }}</div>
+            <div class="k">Image</div><div class="v">{{ h.image | default('') }}</div>
+            <div class="k">OS Type</div><div class="v">{{ h.os_type | default('') }}</div>
+            <div class="k">Zone</div><div class="v">{{ h.zone | default('none') }}</div>
+            <div class="k">NVMe Detected</div><div class="v">{% if h.has_nvme %}<span class="pl po">Yes</span>{% else %}<span class="pl pe">No</span>{% endif %}</div>
+            </div></div>
+
+            <div class="sc"><h4>Block Devices (lsblk)</h4>
+            <pre class="d">{{ h.lsblk | default('') }}</pre>
+            </div>
+          </div>
+          {% endfor %}
+          </div>
+          </div>
+
+          <script>
+          function showVM(i){document.querySelectorAll('.vi').forEach(function(e){e.classList.remove('on')});document.querySelectorAll('.pn').forEach(function(e){e.classList.remove('on')});document.getElementById('n'+i).classList.add('on');document.getElementById('v'+i).classList.add('on');document.getElementById('mn').scrollTop=0}
+          __SCRIPT_END__
+          </body>
+          </html>
+
+    - name: Report summary
+      debug:
+        msg: >-
+          Post-conversion report: {{ combined_report.summary.nvme_ok }}/{{ combined_report.summary.total }} VMs on NVMe.
+          {{ combined_report.summary.nvme_missing }} missing. Results at /var/www/html/
+`.replace('__SCRIPT_END__', '<' + '/script>');
+const POSTCONVERSION_YAML = DEFAULT_POSTCONVERSION_YAML;
 
 const STORAGE_KEY = 'scsi2nvmeUiState';
 
@@ -2008,6 +2250,9 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       $('testYaml').value = DEFAULT_TEST_YAML;
+      $('filterArch').value = 'x64';
+      $('filterGen').value = 'Gen2';
+      $('filterController').value = 'scsi-only';
       return;
     }
     const s = JSON.parse(raw);

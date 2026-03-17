@@ -1,0 +1,424 @@
+{
+    "_meta": {
+        "description": "Post-NVMe Conversion Verification - 41 hosts",
+        "generated_at": "2026-03-17T19:35:45Z",
+        "total_hosts": "41"
+    },
+    "hosts": {
+        "0001-com-ubuntu-minimal-focal-minimal-20-04-lts-gen2-x64-gen2-la": {
+            "has_nvme": true,
+            "hostname": "0001-com-ubuntu-minimal-focal-minimal-20-04-lts-gen2-x64-gen2-la",
+            "image": "Canonical:0001-com-ubuntu-minimal-focal:minimal-20_04-lts-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "0001-com-ubuntu-minimal-focal-minimal-20-04-lts-gen2-x64-gen2-la",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "0001-com-ubuntu-minimal-jammy-minimal-22-04-lts-gen2-x64-gen2-la": {
+            "has_nvme": true,
+            "hostname": "0001-com-ubuntu-minimal-jammy-minimal-22-04-lts-gen2-x64-gen2-la",
+            "image": "Canonical:0001-com-ubuntu-minimal-jammy:minimal-22_04-lts-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "0001-com-ubuntu-minimal-jammy-minimal-22-04-lts-gen2-x64-gen2-la",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "0001-com-ubuntu-server-focal-20-04-lts-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "0001-com-ubuntu-server-focal-20-04-lts-gen2-x64-gen2-latest",
+            "image": "Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nloop0        loop 63.8M        /snap/core20/2571\nloop1        loop 91.9M        /snap/lxd/32662\nloop2        loop 50.9M        /snap/snapd/24671\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "0001-com-ubuntu-server-focal-20-04-lts-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "0001-com-ubuntu-server-jammy-22-04-lts-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "0001-com-ubuntu-server-jammy-22-04-lts-gen2-x64-gen2-latest",
+            "image": "Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nloop0        loop 63.8M        /snap/core20/2717\nloop1        loop 91.4M        /snap/lxd/36918\nloop2        loop 48.1M        /snap/snapd/25935\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "0001-com-ubuntu-server-jammy-22-04-lts-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "almalinux-x86-64-10-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "almalinux-x86-64-10-gen2-x64-gen2-latest",
+            "image": "almalinux:almalinux-x86_64:10-gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    1M nvme   \n\u251c\u2500nvme0n1p2 part  200M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 28.8G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "almalinux-x86-64-10-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "almalinux-x86-64-8-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "almalinux-x86-64-8-gen2-x64-gen2-latest",
+            "image": "almalinux:almalinux-x86_64:8-gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    1M nvme   \n\u251c\u2500nvme0n1p2 part  200M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 28.8G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "almalinux-x86-64-8-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "almalinux-x86-64-9-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "almalinux-x86-64-9-gen2-x64-gen2-latest",
+            "image": "almalinux:almalinux-x86_64:9-gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    1M nvme   \n\u251c\u2500nvme0n1p2 part  200M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 28.8G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "almalinux-x86-64-9-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "azure-linux-3-azure-linux-3-gen2-fips-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "azure-linux-3-azure-linux-3-gen2-fips-x64-gen2-latest",
+            "image": "MicrosoftCBLMariner:azure-linux-3:azure-linux-3-gen2-fips:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk    5G nvme   \n\u251c\u2500nvme0n1p1 part   64M nvme   /boot/efi\n\u251c\u2500nvme0n1p2 part  500M nvme   /boot\n\u2514\u2500nvme0n1p3 part  4.4G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "azure-linux-3-azure-linux-3-gen2-fips-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "azure-linux-3-azure-linux-3-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "azure-linux-3-azure-linux-3-gen2-x64-gen2-latest",
+            "image": "MicrosoftCBLMariner:azure-linux-3:azure-linux-3-gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk    5G nvme   \n\u251c\u2500nvme0n1p1 part   64M nvme   /boot/efi\n\u251c\u2500nvme0n1p2 part  500M nvme   /boot\n\u2514\u2500nvme0n1p3 part  4.4G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "azure-linux-3-azure-linux-3-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "debian-11-11-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "debian-11-11-gen2-x64-gen2-latest",
+            "image": "Debian:debian-11:11-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    3M nvme   \n\u2514\u2500nvme0n1p15 part  124M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "debian-11-11-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "debian-12-12-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "debian-12-12-gen2-x64-gen2-latest",
+            "image": "Debian:debian-12:12-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    3M nvme   \n\u2514\u2500nvme0n1p15 part  124M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "debian-12-12-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "debian-13-13-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "debian-13-13-gen2-x64-gen2-latest",
+            "image": "Debian:debian-13:13-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    3M nvme   \n\u2514\u2500nvme0n1p15 part  124M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "debian-13-13-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "oracle-linux-ol10-lvm-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "oracle-linux-ol10-lvm-gen2-x64-gen2-latest",
+            "image": "Oracle:Oracle-Linux:ol10-lvm-gen2:latest",
+            "lsblk": "NAME               TYPE  SIZE TRAN   MOUNTPOINT\nsda                disk   75G        \n\u2514\u2500sda1             part   75G        /mnt\nnvme0n1            disk   49G nvme   \n\u251c\u2500nvme0n1p1        part  100M nvme   /boot/efi\n\u251c\u2500nvme0n1p2        part    1M nvme   \n\u251c\u2500nvme0n1p3        part    2G nvme   /boot\n\u2514\u2500nvme0n1p4        part 46.9G nvme   \n  \u251c\u2500rootvg-rootlv  lvm  26.9G        /\n  \u2514\u2500rootvg-crashlv lvm    20G        /var/crash",
+            "os_type": "Linux",
+            "vm_name": "oracle-linux-ol10-lvm-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "oracle-linux-ol79-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "oracle-linux-ol79-gen2-x64-gen2-latest",
+            "image": "Oracle:Oracle-Linux:ol79-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN MOUNTPOINT\nnvme0n1      disk   30G      \n\u251c\u2500nvme0n1p1  part  500M      /boot\n\u251c\u2500nvme0n1p14 part    4M      \n\u251c\u2500nvme0n1p2  part   29G      /\n\u2514\u2500nvme0n1p15 part  495M      /boot/efi\nsda          disk   75G      \n\u2514\u2500sda1       part   75G      /mnt",
+            "os_type": "Linux",
+            "vm_name": "oracle-linux-ol79-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "oracle-linux-ol810-lvm-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "oracle-linux-ol810-lvm-gen2-x64-gen2-latest",
+            "image": "Oracle:Oracle-Linux:ol810-lvm-gen2:latest",
+            "lsblk": "NAME               TYPE  SIZE TRAN   MOUNTPOINT\nsda                disk   75G        \n\u2514\u2500sda1             part   75G        /mnt\nnvme0n1            disk   49G nvme   \n\u251c\u2500nvme0n1p1        part    1M nvme   \n\u251c\u2500nvme0n1p2        part    2G nvme   /boot\n\u251c\u2500nvme0n1p3        part  100M nvme   /boot/efi\n\u251c\u2500nvme0n1p4        part    1K nvme   \n\u2514\u2500nvme0n1p5        part 46.9G nvme   \n  \u251c\u2500rootvg-rootlv  lvm  36.9G        /\n  \u2514\u2500rootvg-crashlv lvm    10G        /var/crash",
+            "os_type": "Linux",
+            "vm_name": "oracle-linux-ol810-lvm-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "oracle-linux-ol82-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "oracle-linux-ol82-gen2-x64-gen2-latest",
+            "image": "Oracle:Oracle-Linux:ol82-gen2:latest",
+            "lsblk": "NAME               TYPE  SIZE TRAN   MOUNTPOINT\nsda                disk   75G        \n\u2514\u2500sda1             part   75G        /mnt\nnvme0n1            disk   30G nvme   \n\u251c\u2500nvme0n1p1        part  800M nvme   /boot\n\u251c\u2500nvme0n1p2        part 28.7G nvme   \n\u2502 \u251c\u2500rootvg-rootlv  lvm  18.7G        /\n\u2502 \u2514\u2500rootvg-crashlv lvm    10G        /var/crash\n\u251c\u2500nvme0n1p14       part    4M nvme   \n\u2514\u2500nvme0n1p15       part  495M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "oracle-linux-ol82-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "oracle-linux-ol95-lvm-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "oracle-linux-ol95-lvm-gen2-x64-gen2-latest",
+            "image": "Oracle:Oracle-Linux:ol95-lvm-gen2:latest",
+            "lsblk": "NAME               TYPE  SIZE TRAN   MOUNTPOINT\nsda                disk   75G        \n\u2514\u2500sda1             part   75G        /mnt\nnvme0n1            disk   49G nvme   \n\u251c\u2500nvme0n1p1        part    1M nvme   \n\u251c\u2500nvme0n1p2        part  800M nvme   /boot\n\u251c\u2500nvme0n1p3        part 48.1G nvme   \n\u2502 \u251c\u2500rootvg-rootlv  lvm  38.1G        /\n\u2502 \u2514\u2500rootvg-crashlv lvm    10G        /var/crash\n\u251c\u2500nvme0n1p4        part    1K nvme   \n\u2514\u2500nvme0n1p5        part   99M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "oracle-linux-ol95-lvm-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-10-lvm-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-10-lvm-gen2-x64-gen2",
+            "image": "RedHat:RHEL:10-lvm-gen2:latest",
+            "lsblk": "NAME              TYPE  SIZE TRAN   MOUNTPOINT\nsda               disk   75G        \n\u2514\u2500sda1            part   75G        /mnt\nnvme0n1           disk   64G nvme   \n\u251c\u2500nvme0n1p1       part  500M nvme   /boot/efi\n\u251c\u2500nvme0n1p2       part    1G nvme   /boot\n\u251c\u2500nvme0n1p3       part    2M nvme   \n\u2514\u2500nvme0n1p4       part 62.5G nvme   \n  \u251c\u2500rootvg-homelv lvm     1G        /home\n  \u251c\u2500rootvg-rootlv lvm     2G        /\n  \u251c\u2500rootvg-tmplv  lvm     2G        /tmp\n  \u251c\u2500rootvg-usrlv  lvm    10G        /usr\n  \u2514\u2500rootvg-varlv  lvm    10G        /var",
+            "os_type": "Linux",
+            "vm_name": "rhel-10-lvm-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-8-lvm-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-8-lvm-gen2-x64-gen2",
+            "image": "RedHat:RHEL:8-lvm-gen2:latest",
+            "lsblk": "NAME              TYPE  SIZE TRAN   MOUNTPOINT\nsda               disk   75G        \n\u2514\u2500sda1            part   75G        /mnt\nnvme0n1           disk   64G nvme   \n\u251c\u2500nvme0n1p1       part  500M nvme   /boot\n\u251c\u2500nvme0n1p2       part   63G nvme   \n\u2502 \u251c\u2500rootvg-tmplv  lvm     2G        /tmp\n\u2502 \u251c\u2500rootvg-usrlv  lvm    10G        /usr\n\u2502 \u251c\u2500rootvg-homelv lvm     1G        /home\n\u2502 \u251c\u2500rootvg-varlv  lvm     8G        /var\n\u2502 \u2514\u2500rootvg-rootlv lvm     2G        /\n\u251c\u2500nvme0n1p14      part    4M nvme   \n\u2514\u2500nvme0n1p15      part  495M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "rhel-8-lvm-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-9-lvm-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-9-lvm-gen2-x64-gen2",
+            "image": "RedHat:RHEL:9-lvm-gen2:latest",
+            "lsblk": "NAME              TYPE  SIZE TRAN   MOUNTPOINT\nsda               disk   75G        \n\u2514\u2500sda1            part   75G        /mnt\nnvme0n1           disk   64G nvme   \n\u251c\u2500nvme0n1p1       part  500M nvme   /boot/efi\n\u251c\u2500nvme0n1p2       part    1G nvme   /boot\n\u251c\u2500nvme0n1p3       part    2M nvme   \n\u2514\u2500nvme0n1p4       part 62.5G nvme   \n  \u251c\u2500rootvg-homelv lvm     1G        /home\n  \u251c\u2500rootvg-rootlv lvm     2G        /\n  \u251c\u2500rootvg-tmplv  lvm     2G        /tmp\n  \u251c\u2500rootvg-usrlv  lvm    10G        /usr\n  \u2514\u2500rootvg-varlv  lvm    10G        /var",
+            "os_type": "Linux",
+            "vm_name": "rhel-9-lvm-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-raw-10-raw-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-raw-10-raw-gen2-x64-gen2",
+            "image": "RedHat:rhel-raw:10-raw-gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   32G nvme   \n\u251c\u2500nvme0n1p1 part    1M nvme   \n\u251c\u2500nvme0n1p2 part  200M nvme   /boot/efi\n\u2514\u2500nvme0n1p3 part 31.8G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "rhel-raw-10-raw-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-raw-8-raw-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-raw-8-raw-gen2-x64-gen2",
+            "image": "RedHat:rhel-raw:8-raw-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   32G nvme   \n\u251c\u2500nvme0n1p1  part 31.5G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  495M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "rhel-raw-8-raw-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-raw-89-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-raw-89-gen2-x64-gen2",
+            "image": "RedHat:rhel-raw:89-gen2:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   32G nvme   \n\u251c\u2500nvme0n1p1  part 31.5G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  495M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "rhel-raw-89-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-raw-9-raw-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-raw-9-raw-gen2-x64-gen2",
+            "image": "RedHat:rhel-raw:9-raw-gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   32G nvme   \n\u251c\u2500nvme0n1p1 part    1M nvme   \n\u251c\u2500nvme0n1p2 part  200M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 30.8G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "rhel-raw-9-raw-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-sap-ha-84sapha-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-sap-ha-84sapha-gen2-x64-gen2",
+            "image": "RedHat:RHEL-SAP-HA:84sapha-gen2:latest",
+            "lsblk": "NAME              TYPE  SIZE TRAN   MOUNTPOINT\nsda               disk   75G        \n\u2514\u2500sda1            part   75G        /mnt\nnvme0n1           disk   64G nvme   \n\u251c\u2500nvme0n1p1       part  500M nvme   /boot\n\u251c\u2500nvme0n1p2       part   63G nvme   \n\u2502 \u251c\u2500rootvg-tmplv  lvm     2G        /tmp\n\u2502 \u251c\u2500rootvg-usrlv  lvm    10G        /usr\n\u2502 \u251c\u2500rootvg-homelv lvm     1G        /home\n\u2502 \u251c\u2500rootvg-varlv  lvm     8G        /var\n\u2502 \u2514\u2500rootvg-rootlv lvm     2G        /\n\u251c\u2500nvme0n1p14      part    4M nvme   \n\u2514\u2500nvme0n1p15      part  495M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "rhel-sap-ha-84sapha-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "rhel-sap-ha-96sapha-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "rhel-sap-ha-96sapha-gen2-x64-gen2",
+            "image": "RedHat:RHEL-SAP-HA:96sapha-gen2:latest",
+            "lsblk": "NAME              TYPE  SIZE TRAN   MOUNTPOINT\nsda               disk   75G        \n\u2514\u2500sda1            part   75G        /mnt\nnvme0n1           disk   64G nvme   \n\u251c\u2500nvme0n1p1       part  500M nvme   /boot/efi\n\u251c\u2500nvme0n1p2       part    1G nvme   /boot\n\u251c\u2500nvme0n1p3       part    2M nvme   \n\u2514\u2500nvme0n1p4       part 62.5G nvme   \n  \u251c\u2500rootvg-homelv lvm     1G        /home\n  \u251c\u2500rootvg-rootlv lvm     2G        /\n  \u251c\u2500rootvg-tmplv  lvm     2G        /tmp\n  \u251c\u2500rootvg-usrlv  lvm    10G        /usr\n  \u2514\u2500rootvg-varlv  lvm    10G        /var",
+            "os_type": "Linux",
+            "vm_name": "rhel-sap-ha-96sapha-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "sles-12-sp5-gen2-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "sles-12-sp5-gen2-x64-gen2-latest",
+            "image": "SUSE:sles-12-sp5:gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    2M nvme   \n\u251c\u2500nvme0n1p2 part  512M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 28.5G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "sles-12-sp5-gen2-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "sles-15-sp6-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "sles-15-sp6-gen2-x64-gen2",
+            "image": "SUSE:sles-15-sp6:gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    2M nvme   \n\u251c\u2500nvme0n1p2 part  512M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 28.5G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "sles-15-sp6-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "sles-15-sp7-basic-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "sles-15-sp7-basic-gen2-x64-gen2",
+            "image": "SUSE:sles-15-sp7-basic:gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    2M nvme   \n\u251c\u2500nvme0n1p2 part  512M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 28.5G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "sles-15-sp7-basic-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "sles-16-0-x86-64-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "sles-16-0-x86-64-gen2-x64-gen2",
+            "image": "SUSE:sles-16-0-x86-64:gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    2M nvme   \n\u251c\u2500nvme0n1p2 part  512M nvme   /boot/efi\n\u2514\u2500nvme0n1p3 part 29.5G nvme   /var",
+            "os_type": "Linux",
+            "vm_name": "sles-16-0-x86-64-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "sles-sap-15-sp7-gen2-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "sles-sap-15-sp7-gen2-x64-gen2",
+            "image": "SUSE:sles-sap-15-sp7:gen2:latest",
+            "lsblk": "NAME        TYPE  SIZE TRAN   MOUNTPOINT\nsda         disk   75G        \n\u2514\u2500sda1      part   75G        /mnt\nnvme0n1     disk   30G nvme   \n\u251c\u2500nvme0n1p1 part    2M nvme   \n\u251c\u2500nvme0n1p2 part  512M nvme   /boot/efi\n\u251c\u2500nvme0n1p3 part    1G nvme   /boot\n\u2514\u2500nvme0n1p4 part 28.5G nvme   /",
+            "os_type": "Linux",
+            "vm_name": "sles-sap-15-sp7-gen2-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-22-04-lts-server-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-22-04-lts-server-x64-gen2-latest",
+            "image": "Canonical:ubuntu-22_04-lts:server:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nloop0        loop 63.8M        /snap/core20/2686\nloop1        loop 91.4M        /snap/lxd/36918\nloop2        loop 50.9M        /snap/snapd/25577\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-22-04-lts-server-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-22-04-lts-ubuntu-minimal-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-22-04-lts-ubuntu-minimal-x64-gen2-latest",
+            "image": "Canonical:ubuntu-22_04-lts:ubuntu-minimal:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-22-04-lts-ubuntu-minimal-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-22-04-lts-ubuntu-pro-minimal-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-22-04-lts-ubuntu-pro-minimal-x64-gen2-latest",
+            "image": "Canonical:ubuntu-22_04-lts:ubuntu-pro-minimal:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nloop0        loop 13.4M        /snap/canonical-livepatch/384\nloop1        loop   74M        /snap/core22/2339\nloop2        loop 48.1M        /snap/snapd/25935\nloop3        loop 48.4M        /snap/snapd/26382\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-22-04-lts-ubuntu-pro-minimal-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-22-04-lts-ubuntu-pro-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-22-04-lts-ubuntu-pro-x64-gen2-latest",
+            "image": "Canonical:ubuntu-22_04-lts:ubuntu-pro:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nloop0        loop 13.4M        /snap/canonical-livepatch/384\nloop1        loop 63.8M        /snap/core20/2686\nloop2        loop   74M        /snap/core22/2339\nloop3        loop 91.4M        /snap/lxd/36918\nloop4        loop 48.1M        /snap/snapd/25935\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 29.9G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-22-04-lts-ubuntu-pro-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-24-04-lts-minimal-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-24-04-lts-minimal-x64-gen2-latest",
+            "image": "Canonical:ubuntu-24_04-lts:minimal:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part   29G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u251c\u2500nvme0n1p15 part  106M nvme   /boot/efi\n\u2514\u2500nvme0n1p16 part  913M nvme   /boot",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-24-04-lts-minimal-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-24-04-lts-server-x64-gen2": {
+            "has_nvme": true,
+            "hostname": "ubuntu-24-04-lts-server-x64-gen2",
+            "image": "Canonical:ubuntu-24_04-lts:server:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part   29G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u251c\u2500nvme0n1p15 part  106M nvme   /boot/efi\n\u2514\u2500nvme0n1p16 part  913M nvme   /boot",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-24-04-lts-server-x64-gen2",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-24-04-lts-ubuntu-pro-minimal-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-24-04-lts-ubuntu-pro-minimal-x64-gen2-latest",
+            "image": "Canonical:ubuntu-24_04-lts:ubuntu-pro-minimal:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nloop0        loop 13.4M        /snap/canonical-livepatch/384\nloop1        loop   74M        /snap/core22/2339\nloop2        loop 48.1M        /snap/snapd/25935\nloop3        loop 48.4M        /snap/snapd/26382\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part   29G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u251c\u2500nvme0n1p15 part  106M nvme   /boot/efi\n\u2514\u2500nvme0n1p16 part  913M nvme   /boot",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-24-04-lts-ubuntu-pro-minimal-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-24-04-lts-ubuntu-pro-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-24-04-lts-ubuntu-pro-x64-gen2-latest",
+            "image": "Canonical:ubuntu-24_04-lts:ubuntu-pro:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nloop0        loop 13.4M        /snap/canonical-livepatch/384\nloop1        loop   74M        /snap/core22/2339\nloop2        loop 48.1M        /snap/snapd/25935\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part   29G nvme   /\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u251c\u2500nvme0n1p15 part  106M nvme   /boot/efi\n\u2514\u2500nvme0n1p16 part  913M nvme   /boot",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-24-04-lts-ubuntu-pro-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-25-10-minimal-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-25-10-minimal-x64-gen2-latest",
+            "image": "Canonical:ubuntu-25_10:minimal:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 28.9G nvme   /\n\u251c\u2500nvme0n1p13 part 1023M nvme   /boot\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-25-10-minimal-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        },
+        "ubuntu-25-10-server-x64-gen2-latest": {
+            "has_nvme": true,
+            "hostname": "ubuntu-25-10-server-x64-gen2-latest",
+            "image": "Canonical:ubuntu-25_10:server:latest",
+            "lsblk": "NAME         TYPE  SIZE TRAN   MOUNTPOINT\nsda          disk   75G        \n\u2514\u2500sda1       part   75G        /mnt\nnvme0n1      disk   30G nvme   \n\u251c\u2500nvme0n1p1  part 28.9G nvme   /\n\u251c\u2500nvme0n1p13 part 1023M nvme   /boot\n\u251c\u2500nvme0n1p14 part    4M nvme   \n\u2514\u2500nvme0n1p15 part  106M nvme   /boot/efi",
+            "os_type": "Linux",
+            "vm_name": "ubuntu-25-10-server-x64-gen2-latest",
+            "vm_size": "Standard_E2bds_v5",
+            "zone": ""
+        }
+    },
+    "summary": {
+        "nvme_missing": "0",
+        "nvme_ok": "41",
+        "total": "41"
+    }
+}
