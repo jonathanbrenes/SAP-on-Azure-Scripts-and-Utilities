@@ -291,6 +291,9 @@
 // ---------------------------------------------------------------------------
 const imageOptions = [
   // RedHat
+  { key: 'rhel_10_0_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL 10.0 (Gen1) (RedHat:RHEL:10_0:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'10_0', version:'latest' } },
   { key: 'rhel_10_1_x64_gen1', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
     label: 'RHEL 10.1 (Gen1) (RedHat:RHEL:10_1:latest)',
     ref: { publisher:'RedHat', offer:'RHEL', sku:'10_1', version:'latest' } },
@@ -366,6 +369,57 @@ const imageOptions = [
   { key: 'rhel_sap_ha_96sapha_gen2_x64_gen2', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
     label: 'RHEL SAP HA 9.6 (Gen2) (RedHat:RHEL-SAP-HA:96sapha-gen2:latest)',
     ref: { publisher:'RedHat', offer:'RHEL-SAP-HA', sku:'96sapha-gen2', version:'latest' } },
+  { key: 'rhel-7-9-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL x86_64 (Gen1) (RedHat:RHEL:7_9:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'7_9', version:'latest' } },
+  { key: 'rhel-8-10-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL x86_64 (Gen1) (RedHat:RHEL:8_10:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'8_10', version:'latest' } },
+  { key: 'rhel-8-8-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL x86_64 (Gen1) (RedHat:RHEL:8_8:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'8_8', version:'latest' } },
+  { key: 'rhel-96-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL x86_64 (Gen2) (RedHat:RHEL:96-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'96-gen2', version:'latest' } },
+  { key: 'rhel-9-6-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL x86_64 (Gen1) (RedHat:RHEL:9_6:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL', sku:'9_6', version:'latest' } },
+  { key: 'rhel-ha-8-10-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Ha x86_64 (Gen1) (RedHat:RHEL-HA:8_10:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-HA', sku:'8_10', version:'latest' } },
+  { key: 'rhel-ha-8-8-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Ha x86_64 (Gen2) (RedHat:RHEL-HA:8_8-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-HA', sku:'8_8-gen2', version:'latest' } },
+  { key: 'rhel-ha-rhel-9-6-with-ha-add-on-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL Ha x86_64 (Gen1) (RedHat:RHEL-HA:rhel_9_6_with_ha_add_on:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-HA', sku:'rhel_9_6_with_ha_add_on', version:'latest' } },
+  { key: 'rhel-sap-apps-10-0-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Apps x86_64 (Gen1) (RedHat:RHEL-SAP-APPS:10_0:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-APPS', sku:'10_0', version:'latest' } },
+  { key: 'rhel-sap-apps-7-9-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Apps x86_64 (Gen1) (RedHat:RHEL-SAP-APPS:7_9:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-APPS', sku:'7_9', version:'latest' } },
+  { key: 'rhel-sap-apps-8-10-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Apps x86_64 (Gen1) (RedHat:RHEL-SAP-APPS:8_10:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-APPS', sku:'8_10', version:'latest' } },
+  { key: 'rhel-sap-apps-8-8-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Apps x86_64 (Gen1) (RedHat:RHEL-SAP-APPS:8_8:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-APPS', sku:'8_8', version:'latest' } },
+  { key: 'rhel-sap-apps-96sapapps-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
+    label: 'RHEL SAP Apps x86_64 (Gen2) (RedHat:RHEL-SAP-APPS:96sapapps-gen2:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-APPS', sku:'96sapapps-gen2', version:'latest' } },
+  { key: 'rhel-sap-ha-10-0-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Ha x86_64 (Gen1) (RedHat:RHEL-SAP-HA:10_0:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-HA', sku:'10_0', version:'latest' } },
+  { key: 'rhel-sap-ha-7-9-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Ha x86_64 (Gen1) (RedHat:RHEL-SAP-HA:7_9:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-HA', sku:'7_9', version:'latest' } },
+  { key: 'rhel-sap-ha-8-10-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Ha x86_64 (Gen1) (RedHat:RHEL-SAP-HA:8_10:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-HA', sku:'8_10', version:'latest' } },
+  { key: 'rhel-sap-ha-8-8-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
+    label: 'RHEL SAP Ha x86_64 (Gen1) (RedHat:RHEL-SAP-HA:8_8:latest)',
+    ref: { publisher:'RedHat', offer:'RHEL-SAP-HA', sku:'8_8', version:'latest' } },
   // Debian
   { key: 'debian_11_11_x64_gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
     label: 'Debian 11 x86_64 (Gen1) (Debian:debian-11:11:latest)',
@@ -653,10 +707,6 @@ const imageOptions = [
     { key: 'oracle-linux-ol810-lvm-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: true, scsiCapable: true,
       label: 'Oracle Linux x86_64 (Gen2) (Oracle:Oracle-Linux:ol810-lvm-gen2:latest)',
       ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol810-lvm-gen2', version:'latest' } },
-
-    { key: 'oracle-linux-ol82-gen2-x64-gen2_latest', arch: 'x64', gen: 'Gen2', nvmeCapable: false, scsiCapable: true,
-      label: 'Oracle Linux x86_64 (Gen2) (Oracle:Oracle-Linux:ol82-gen2:latest)',
-      ref: { publisher:'Oracle', offer:'Oracle-Linux', sku:'ol82-gen2', version:'latest' } },
 
     { key: 'oracle-linux-ol95-lvm-x64-gen1_latest', arch: 'x64', gen: 'Gen1', nvmeCapable: false, scsiCapable: true,
       label: 'Oracle Linux x86_64 (Gen1) (Oracle:Oracle-Linux:ol95-lvm:latest)',
@@ -1651,6 +1701,8 @@ const DEFAULT_TEST_YAML = String.raw`---
                   echo "[DRYRUN] nvme_core.io_timeout already set to 240. No grub changes needed."
                   echo "nvme_core_io_timeout=240" > "$staging_dir/modified/nvme-timeout-status.txt"
                   echo "status=already_configured" >> "$staging_dir/modified/nvme-timeout-status.txt"
+              elif command -v grubby &>/dev/null && grubby --info=ALL 2>/dev/null | grep -q "nvme_core.io_timeout=240"; then
+                  echo "[INFO] nvme_core.io_timeout is set to 240 (BLS entries)."
               else
                   echo "[WARNING] nvme_core.io_timeout is not set to 240."
                   echo "[DRYRUN] Staging grub changes..."

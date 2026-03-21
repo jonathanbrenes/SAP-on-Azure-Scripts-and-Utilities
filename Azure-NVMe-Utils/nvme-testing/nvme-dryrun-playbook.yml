@@ -135,6 +135,8 @@
                   echo "[DRYRUN] nvme_core.io_timeout already set to 240. No grub changes needed."
                   echo "nvme_core_io_timeout=240" > "$staging_dir/modified/nvme-timeout-status.txt"
                   echo "status=already_configured" >> "$staging_dir/modified/nvme-timeout-status.txt"
+              elif command -v grubby &>/dev/null && grubby --info=ALL 2>/dev/null | grep -q "nvme_core.io_timeout=240"; then
+                  echo "[INFO] nvme_core.io_timeout is set to 240 (BLS entries)."
               else
                   echo "[WARNING] nvme_core.io_timeout is not set to 240."
                   echo "[DRYRUN] Staging grub changes..."

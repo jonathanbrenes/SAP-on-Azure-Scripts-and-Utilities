@@ -860,6 +860,8 @@ check_nvme_timeout() {
             echo "nvme_core_io_timeout=240" > "$staging_dir/modified/nvme-timeout-status.txt"
             echo "status=already_configured" >> "$staging_dir/modified/nvme-timeout-status.txt"
         fi
+    elif command -v grubby &>/dev/null && grubby --info=ALL 2>/dev/null | grep -q "nvme_core.io_timeout=240"; then
+        echo "[INFO] nvme_core.io_timeout is set to 240 (BLS entries)."
     else
         echo "[WARNING] nvme_core.io_timeout is not set to 240."
         if $fix; then
@@ -962,6 +964,8 @@ check_nvme_timeout() {
 
                 if grep -q "nvme_core.io_timeout=240" $_grub_check_files 2>/dev/null; then
                     echo "[INFO] nvme_core.io_timeout set successfully."
+                elif command -v grubby &>/dev/null && grubby --info=ALL 2>/dev/null | grep -q "nvme_core.io_timeout=240"; then
+                    echo "[INFO] nvme_core.io_timeout set successfully (BLS entries)."
                 else
                     echo "[ERROR] Failed to set nvme_core.io_timeout."
                 fi

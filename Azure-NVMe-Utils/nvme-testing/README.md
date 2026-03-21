@@ -13,7 +13,7 @@ Phase 1: Dry-Run Assessment        Phase 2: Apply OS Fixes        Phase 3: VM Co
 | standalone script runs  |    | fix mode (or manual)      |    | per-VM: resize + controller  |
 | checks on all hosts     |--->| to rebuild initramfs,     |--->| type change, with OS checks  |
 |                         |    | update grub, fix fstab    |    | and optional -DryRun         |
-| Output: results.json    |    |                           |    |                              |
+| Output: JSON report     |    |                           |    |                              |
 | + HTML report           |    | Re-validate until clean   |    | Loop over all VMs in RG      |
 +-------------------------+    +---------------------------+    +------------------------------+
 ```
@@ -48,7 +48,6 @@ cat nvme-dryrun-report.json | python3 -m json.tool
 
 The playbook writes:
 - `nvme-dryrun-report.json` — local JSON report in the playbook directory
-- `/var/www/html/results.json` — same JSON, downloadable via httpd
 - `/var/www/html/index.html` — interactive HTML dashboard with per-host detail panels
 
 ### Option B: Standalone Script (single host)
@@ -215,95 +214,96 @@ $jobs | Remove-Job
 |---|---|
 | `nvme-dryrun-playbook.yml` | Self-contained Ansible playbook — runs dry-run assessment and produces JSON + HTML reports |
 | `nvme-check-dryrun.sh` | Standalone bash script — supports check, fix, and dry-run modes via `-fix` and `-dry` flags |
-| `nvme-postconversion-check.yml` | Ansible playbook — post-conversion verification (IMDS + lsblk), produces `post.json` |
+| `nvme-postconversion-check.yml` | Ansible playbook — post-conversion verification (IMDS + lsblk) |
 | `scsi2nvme-tester.html` | Browser-based ARM template builder for deploying a test lab in Azure |
-| `results.json` | Sample output from a 41-host dry-run assessment (Gen2 x64 only) |
-| `post.json` | Post-conversion verification — 41 hosts, all confirmed booting on NVMe |
 
 ## Tested VM Images
 
-The following 41 Azure Marketplace images (x64, Gen2 only) were validated in the dry-run assessment and post-conversion verification. All 41 VMs converted successfully to NVMe and boot on `nvme0n1`.
+The following 44 Azure Marketplace images (x64, Gen2 only) were validated in the dry-run assessment and post-conversion verification. All 44 VMs converted successfully to NVMe and boot on `nvme0n1`.
 
 ### AlmaLinux (3 images)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| almalinux-x86-64-8-gen2-x64-gen2-latest | 8.10 | 4.18.0-553.72.1.el8_10.x86_64 | No |
-| almalinux-x86-64-9-gen2-x64-gen2-latest | 9.7 | 5.14.0-611.13.1.el9_7.x86_64 | No |
-| almalinux-x86-64-10-gen2-x64-gen2-latest | 10.1 | 6.12.0-124.20.1.el10_1.x86_64 | No |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| almalinux:almalinux-x86_64:8-gen2:latest | 4.18.0-553.72.1.el8_10.x86_64 | No |
+| almalinux:almalinux-x86_64:9-gen2:latest | 5.14.0-611.13.1.el9_7.x86_64 | No |
+| almalinux:almalinux-x86_64:10-gen2:latest | 6.12.0-124.20.1.el10_1.x86_64 | No |
 
 ### Azure Linux (2 images)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| azure-linux-3-azure-linux-3-gen2-x64-gen2-latest | 3.0 | 6.6.126.1-1.azl3 | Yes — grub |
-| azure-linux-3-azure-linux-3-gen2-fips-x64-gen2-latest | 3.0 | 6.6.126.1-1.azl3 | Yes — grub |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| MicrosoftCBLMariner:azure-linux-3:azure-linux-3-gen2:latest | 6.6.126.1-1.azl3 | Yes — grub |
+| MicrosoftCBLMariner:azure-linux-3:azure-linux-3-gen2-fips:latest | 6.6.126.1-1.azl3 | Yes — grub |
 
 ### Debian (3 images)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| debian-11-11-gen2-x64-gen2-latest | 11 | 5.10.0-38-cloud-amd64 | Yes — grub |
-| debian-12-12-gen2-x64-gen2-latest | 12.13 | 6.1.0-44-cloud-amd64 | No |
-| debian-13-13-gen2-x64-gen2-latest | 13.3 | 6.12.74+deb13+1-cloud-amd64 | No |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| Debian:debian-11:11-gen2:latest | 5.10.0-39-cloud-amd64 | Yes — grub |
+| Debian:debian-12:12-gen2:latest | 6.1.0-44-cloud-amd64 | No |
+| Debian:debian-13:13-gen2:latest | 6.12.74+deb13+1-cloud-amd64 | No |
 
-### Oracle Linux (5 images)
+### Oracle Linux (4 images)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| oracle-linux-ol79-gen2-x64-gen2-latest | 7.9 | 5.4.17-2036.101.2.el7uek.x86_64 | Yes — initramfs (pci-hyperv), grub |
-| oracle-linux-ol82-gen2-x64-gen2-latest | 8.2 | 5.4.17-2011.4.6.el8uek.x86_64 | Yes — initramfs (nvme + pci-hyperv), grub |
-| oracle-linux-ol810-lvm-gen2-x64-gen2-latest | 8.10 | 5.15.0-317.197.5.1.el8uek.x86_64 | Yes — grub, grubby (BLS) |
-| oracle-linux-ol95-lvm-gen2-x64-gen2-latest | 9.5 | 5.15.0-307.178.5.el9uek.x86_64 | Yes — grub, grubby (BLS) |
-| oracle-linux-ol10-lvm-gen2-x64-gen2-latest | 10.0 | 6.12.0-104.43.4.3.el10uek.x86_64 | Yes — grub, grubby (BLS) |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| Oracle:Oracle-Linux:ol79-gen2:latest | 5.4.17-2036.101.2.el7uek.x86_64 | Yes — initramfs (pci-hyperv), grub |
+| Oracle:Oracle-Linux:ol810-lvm-gen2:latest | 5.15.0-317.197.5.1.el8uek.x86_64 | Yes — grub, grubby (BLS) |
+| Oracle:Oracle-Linux:ol95-lvm-gen2:latest | 5.15.0-307.178.5.el9uek.x86_64 | Yes — grub, grubby (BLS) |
+| Oracle:Oracle-Linux:ol10-lvm-gen2:latest | 6.12.0-104.43.4.3.el10uek.x86_64 | Yes — grub, grubby (BLS) |
 
-### RHEL (9 images)
+### RHEL (12 images)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| rhel-8-lvm-gen2-x64-gen2 | 8.10 | 4.18.0-553.el8_10.x86_64 | Yes — grub, grubby (BLS) |
-| rhel-raw-8-raw-gen2-x64-gen2 | 8.10 | 4.18.0-553.56.1.el8_10.x86_64 | No |
-| rhel-raw-89-gen2-x64-gen2 | 8.9 | 4.18.0-513.11.1.el8_9.x86_64 | Yes — grub, grubby (BLS) |
-| rhel-sap-ha-84sapha-gen2-x64-gen2 | 8.4 | 4.18.0-305.150.1.el8_4.x86_64 | Yes — grub, grubby (BLS) |
-| rhel-sap-ha-96sapha-gen2-x64-gen2 | 9.6 | 5.14.0-570.94.1.el9_6.x86_64 | No |
-| rhel-9-lvm-gen2-x64-gen2 | 9.7 | 5.14.0-611.36.1.el9_7.x86_64 | No |
-| rhel-raw-9-raw-gen2-x64-gen2 | 9.7 | 5.14.0-611.36.1.el9_7.x86_64 | No |
-| rhel-10-lvm-gen2-x64-gen2 | 10.1 | 6.12.0-124.38.1.el10_1.x86_64 | No |
-| rhel-raw-10-raw-gen2-x64-gen2 | 10.1 | 6.12.0-124.38.1.el10_1.x86_64 | No |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| RedHat:RHEL:8-lvm-gen2:latest | 4.18.0-553.el8_10.x86_64 | Yes — grub, grubby (BLS) |
+| RedHat:rhel-raw:8-raw-gen2:latest | 4.18.0-553.56.1.el8_10.x86_64 | No |
+| RedHat:rhel-raw:89-gen2:latest | 4.18.0-513.11.1.el8_9.x86_64 | Yes — grub, grubby (BLS) |
+| RedHat:RHEL-HA:8_8-gen2:latest | 4.18.0-477.36.1.el8_8.x86_64 | Yes — grub, grubby (BLS) |
+| RedHat:RHEL-SAP-HA:84sapha-gen2:latest | 4.18.0-305.150.1.el8_4.x86_64 | Yes — grub, grubby (BLS) |
+| RedHat:RHEL:96-gen2:latest | 5.14.0-570.94.1.el9_6.x86_64 | No |
+| RedHat:RHEL:9-lvm-gen2:latest | 5.14.0-611.36.1.el9_7.x86_64 | No |
+| RedHat:rhel-raw:9-raw-gen2:latest | 5.14.0-611.36.1.el9_7.x86_64 | No |
+| RedHat:RHEL-SAP-APPS:96sapapps-gen2:latest | 5.14.0-570.94.1.el9_6.x86_64 | No |
+| RedHat:RHEL-SAP-HA:96sapha-gen2:latest | 5.14.0-570.94.1.el9_6.x86_64 | No |
+| RedHat:RHEL:10-lvm-gen2:latest | 6.12.0-124.38.1.el10_1.x86_64 | No |
+| RedHat:rhel-raw:10-raw-gen2:latest | 6.12.0-124.38.1.el10_1.x86_64 | No |
 
 ### SLES (4 images)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| sles-12-sp5-gen2-x64-gen2-latest | 12.5 | 4.12.14-16.200-azure | Yes — grub |
-| sles-15-sp6-gen2-x64-gen2 | 15.6 | 6.4.0-150600.8.58-azure | No |
-| sles-15-sp7-basic-gen2-x64-gen2 | 15.7 | 6.4.0-150700.20.24-azure | No |
-| sles-16-0-x86-64-gen2-x64-gen2 | 16.0 | 6.12.0-160000.9-default | No |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| SUSE:sles-12-sp5:gen2:latest | 4.12.14-16.200-azure | Yes — grub |
+| SUSE:sles-15-sp6:gen2:latest | 6.4.0-150600.8.58-azure | No |
+| SUSE:sles-15-sp7-basic:gen2:latest | 6.4.0-150700.20.24-azure | No |
+| SUSE:sles-16-0-x86-64:gen2:latest | 6.12.0-160000.9-default | No |
 
 ### SLES SAP (1 image)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| sles-sap-15-sp7-gen2-x64-gen2 | 15.7 | 6.4.0-150700.53.28-default | No |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| SUSE:sles-sap-15-sp7:gen2:latest | 6.4.0-150700.53.28-default | No |
 
-### Ubuntu (14 images)
+### Ubuntu (15 images)
 
-| Hostname | Version | Kernel | Needs Changes |
-|---|---|---|---|
-| 0001-com-ubuntu-minimal-focal-minimal-20-04-lts-gen2-x64-gen2-la | 20.04 | 5.15.0-1089-azure | No |
-| 0001-com-ubuntu-server-focal-20-04-lts-gen2-x64-gen2-latest | 20.04 | 5.15.0-1089-azure | No |
-| 0001-com-ubuntu-minimal-jammy-minimal-22-04-lts-gen2-x64-gen2-la | 22.04 | 6.8.0-1044-azure | No |
-| 0001-com-ubuntu-server-jammy-22-04-lts-gen2-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-server-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-minimal-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-pro-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-22-04-lts-ubuntu-pro-minimal-x64-gen2-latest | 22.04 | 6.8.0-1044-azure | No |
-| ubuntu-24-04-lts-server-x64-gen2 | 24.04 | 6.17.0-1008-azure | No |
-| ubuntu-24-04-lts-minimal-x64-gen2-latest | 24.04 | 6.14.0-1017-azure | No |
-| ubuntu-24-04-lts-ubuntu-pro-x64-gen2-latest | 24.04 | 6.14.0-1017-azure | No |
-| ubuntu-24-04-lts-ubuntu-pro-minimal-x64-gen2-latest | 24.04 | 6.17.0-1008-azure | No |
-| ubuntu-25-10-server-x64-gen2-latest | 25.10 | 6.17.0-1006-azure | No |
-| ubuntu-25-10-minimal-x64-gen2-latest | 25.10 | 6.17.0-1006-azure | No |
+| URN | Kernel | Needs Changes |
+|---|---|---|
+| Canonical:0001-com-ubuntu-minimal-focal:minimal-20_04-lts-gen2:latest | 5.15.0-1089-azure | No |
+| Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest | 5.15.0-1089-azure | No |
+| Canonical:0001-com-ubuntu-minimal-jammy:minimal-22_04-lts-gen2:latest | 6.8.0-1044-azure | No |
+| Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest | 6.8.0-1044-azure | No |
+| Canonical:ubuntu-22_04-lts:server:latest | 6.8.0-1044-azure | No |
+| Canonical:ubuntu-22_04-lts:ubuntu-minimal:latest | 6.8.0-1044-azure | No |
+| Canonical:ubuntu-22_04-lts:ubuntu-pro:latest | 6.8.0-1044-azure | No |
+| Canonical:ubuntu-22_04-lts:ubuntu-pro-fips:latest | 6.8.0-1044-azure | No |
+| Canonical:ubuntu-22_04-lts:ubuntu-pro-minimal:latest | 6.8.0-1044-azure | No |
+| Canonical:ubuntu-24_04-lts:server:latest | 6.17.0-1008-azure | No |
+| Canonical:ubuntu-24_04-lts:minimal:latest | 6.14.0-1017-azure | No |
+| Canonical:ubuntu-24_04-lts:ubuntu-pro:latest | 6.14.0-1017-azure | No |
+| Canonical:ubuntu-24_04-lts:ubuntu-pro-minimal:latest | 6.17.0-1008-azure | No |
+| Canonical:ubuntu-25_10:server:latest | 6.17.0-1006-azure | No |
+| Canonical:ubuntu-25_10:minimal:latest | 6.17.0-1006-azure | No |
 
 ### Summary
 
@@ -312,14 +312,14 @@ The following 41 Azure Marketplace images (x64, Gen2 only) were validated in the
 | AlmaLinux | 3 | 3 | 0 | 0 |
 | Azure Linux | 2 | 2 | 2 | 0 |
 | Debian | 3 | 3 | 1 | 0 |
-| Oracle Linux | 5 | 5 | 5 | 3 |
-| RHEL | 9 | 9 | 3 | 3 |
+| Oracle Linux | 4 | 4 | 4 | 3 |
+| RHEL | 12 | 12 | 4 | 4 |
 | SLES | 4 | 4 | 1 | 0 |
 | SLES SAP | 1 | 1 | 0 | 0 |
-| Ubuntu | 14 | 14 | 0 | 0 |
-| **Total** | **41** | **41** | **12** | **6** |
+| Ubuntu | 15 | 15 | 0 | 0 |
+| **Total** | **44** | **44** | **12** | **7** |
 
-> **41 of 41 VMs converted successfully to NVMe** with zero boot failures. The 12 that needed changes had `nvme_core.io_timeout=240` added to grub (and/or initramfs rebuilt with `pci-hyperv`) automatically via `-FixOperatingSystemSettings`. Of those, 6 also had BLS enabled and used `grubby --update-kernel=ALL`. **OL 7.9 (UEK 5.4.17)** required both `pci-hyperv` addition to initramfs and `nvme_core.io_timeout=240` in grub — the script now detects and fixes this automatically. Post-conversion verification via `post.json` confirmed all 41 hosts boot on `nvme0n1` with OS disk mounted correctly.
+> **44 of 44 VMs converted successfully to NVMe** with zero boot failures. The 12 that needed changes had `nvme_core.io_timeout=240` added to grub (and/or initramfs rebuilt with `pci-hyperv`) automatically via `-FixOperatingSystemSettings`. Of those, 7 also had BLS enabled and used `grubby --update-kernel=ALL`. **OL 7.9 (UEK 5.4.17)** required both `pci-hyperv` addition to initramfs and `nvme_core.io_timeout=240` in grub — the script now detects and fixes this automatically. Post-conversion verification confirmed all 44 hosts boot on `nvme0n1` with OS disk mounted correctly.
 
 ---
 
@@ -328,9 +328,9 @@ The following 41 Azure Marketplace images (x64, Gen2 only) were validated in the
 ```json
 {
     "_meta": {
-        "description": "SCSI-to-NVMe Conversion Dry-Run Assessment - 41 hosts",
-        "generated_at": "2026-03-17T13:26:55Z",
-        "total_hosts": "41"
+        "description": "SCSI-to-NVMe Conversion Dry-Run Assessment - 44 hosts",
+        "generated_at": "2026-03-20T17:02:00Z",
+        "total_hosts": "44"
     },
     "hosts": {
         "rhel-10-lvm-gen2-x64-gen2": {
