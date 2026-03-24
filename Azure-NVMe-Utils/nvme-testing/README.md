@@ -263,6 +263,8 @@ The following 44 Azure Marketplace images (x64, Gen2 only) were validated in the
 | SUSE:sles-15-sp7-basic:gen2:latest | 6.4.0-150700.20.24-azure | No |
 | SUSE:sles-16-0-x86-64:gen2:latest | 6.12.0-160000.9-default | No |
 
+> **Known issue — SLES 12 SP5 on NVMe-only VM sizes:** Kernel 4.12.14-16.200-azure panics when booting on NVMe-only sizes (tested on Intel Ddsv6 and AMD Dadsv7). The OS disk NVMe controller initialises successfully, but the temp/resource disk NVMe controller triggers `can't allocate MSI-X affinity masks for 1 vectors` → NULL pointer dereference in `suse_msi_set_irq_unmanaged`. This is a kernel bug — not actionable by the conversion script. SLES 12 SP5 (EOL Oct 2024) works on dual-controller sizes like `Standard_E2bds_v5` where the temp disk uses SCSI. Further troubleshooting pending.
+
 ### SLES SAP (1 image)
 
 | URN | Kernel | Needs Changes |
@@ -303,7 +305,9 @@ The following 44 Azure Marketplace images (x64, Gen2 only) were validated in the
 | Ubuntu | 15 | 15 | 0 | 0 |
 | **Total** | **44** | **44** | **12** | **7** |
 
-> **44 of 44 VMs converted successfully to NVMe** with zero boot failures. The 12 that needed changes had `nvme_core.io_timeout=240` added to grub (and/or initramfs rebuilt with `pci-hyperv`) automatically via `-FixOperatingSystemSettings`. Of those, 7 also had BLS enabled and used `grubby --update-kernel=ALL`. **OL 7.9 (UEK 5.4.17)** required both `pci-hyperv` addition to initramfs and `nvme_core.io_timeout=240` in grub — the script now detects and fixes this automatically. Post-conversion verification confirmed all 44 hosts boot on `nvme0n1` with OS disk mounted correctly.
+> **44 of 44 VMs converted successfully to NVMe** with zero boot failures on `Standard_E2bds_v5` (dual-controller). The 12 that needed changes had `nvme_core.io_timeout=240` added to grub (and/or initramfs rebuilt with `pci-hyperv`) automatically via `-FixOperatingSystemSettings`. Of those, 7 also had BLS enabled and used `grubby --update-kernel=ALL`. **OL 7.9 (UEK 5.4.17)** required both `pci-hyperv` addition to initramfs and `nvme_core.io_timeout=240` in grub — the script now detects and fixes this automatically. Post-conversion verification confirmed all 44 hosts boot on `nvme0n1` with OS disk mounted correctly.
+>
+> **On NVMe-only sizes** (Intel Ddsv6 `Standard_D2ds_v6`, AMD Dadsv7 `Standard_D2ads_v7`): 44 of 45 VMs converted successfully. **1 failure: SLES 12 SP5** — kernel panic due to MSI-X affinity mask allocation bug in kernel 4.12.14. See known issue note under SLES section above. Further troubleshooting pending.
 
 ---
 

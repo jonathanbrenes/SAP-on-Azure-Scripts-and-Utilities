@@ -10,7 +10,7 @@
 
 ## Implementation Status
 
-> **Last updated:** 2026-03-17 — all fixes implemented across PS1, standalone script, and playbook
+> **Last updated:** 2026-03-24 — all fixes implemented across PS1, standalone script, and playbook; v5/v6/v7 conversion tests complete
 
 | Fix # | Severity | Title | Status | Notes |
 |---|---|---|---|---|
@@ -29,6 +29,14 @@
 | 12 | LOW | Inconsistent `sudo` usage | ✅ Done | Removed all `sudo` prefixes — script runs as root via `Invoke-AzVMRunCommand` |
 
 **Dry-run test results (2026-03-17, run 3 — with pci-hyperv check + rescue exclusion):** 41 of 41 Gen2 x64 VMs converted to NVMe and boot successfully. 12 needed grub changes (`nvme_core.io_timeout=240`), of which 6 also have BLS enabled. OL 7.9 (UEK 5.4.17) now succeeds — `pci-hyperv` was missing from initramfs and is now detected and added automatically. Post-conversion verification (`post.json`) confirmed all 41 hosts boot on `nvme0n1`.
+
+**Conversion test results (2026-03-24, Standard_E2bds_v5):** 45 unique Gen2 x64 VMs converted from SCSI (`Standard_B2s`) to NVMe (`Standard_E2bds_v5`) using `Azure-NVMe-Conversion.ps1` with `-FixOperatingSystemSettings -StartVM`. All 45 VMs updated and started successfully.
+
+**Conversion test results (2026-03-24, Standard_D2ds_v6 — Intel Ddsv6):** 44 of 45 VMs converted from SCSI (`Standard_B2s`) to NVMe (`Standard_D2ds_v6`). **1 failure: `sles-12-sp5-gen2-x64-gen2-latest`** — kernel 4.12.14-16.200-azure panics during boot. The OS disk NVMe controller (`nvme0`) initialises, but the temp/resource disk controller (`nvme1`) triggers `can't allocate MSI-X affinity masks for 1 vectors` → NULL pointer dereference in `suse_msi_set_irq_unmanaged` → kernel oops. This is a kernel bug in SLES 12 SP5 (EOL Oct 2024); no fix expected. Not actionable by the conversion script.
+
+**Conversion test results (2026-03-24, Standard_D2ads_v7 — AMD Dadsv7):** 44 of 45 VMs converted from SCSI (`Standard_B2s`) to NVMe (`Standard_D2ads_v7`). **Same failure: `sles-12-sp5-gen2-x64-gen2-latest`** — identical kernel panic as on Ddsv6. The bug is in `suse_msi_set_irq_unmanaged` (SUSE-patched MSI-X code in kernel 4.12.14-16.200-azure): the temp/resource disk NVMe controller fails `can't allocate MSI-X affinity masks for 1 vectors` → NULL dereference. Confirmed hardware-independent — fails on both Intel (Ddsv6) and AMD (Dadsv7). SLES 12 SP5 is EOL (Oct 2024); **this OS cannot run on NVMe-only VM sizes**. It works fine on dual-controller sizes like `Standard_E2bds_v5` where the temp disk stays on SCSI.
+
+**Pending: SLES 12 SP5 troubleshooting on v6/v7.** Further investigation needed to determine if a kernel update or workaround exists for the MSI-X affinity mask allocation failure on NVMe-only VM sizes.
 
 ---
 

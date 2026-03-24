@@ -1726,7 +1726,8 @@ const DEFAULT_TEST_YAML = String.raw`---
                       cp "$grub_file" "$staging_dir/original/grub"
                       cp "$grub_file" "$staging_dir/modified/grub"
                       case "$distro" in
-                          ubuntu|debian) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          ubuntu) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
+                          debian) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
                           suse|sles|opensuse*) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
                           ol) sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;
                           *) sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub" ;;

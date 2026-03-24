@@ -876,7 +876,10 @@ check_nvme_timeout() {
                     cp "$grub_file" "$staging_dir/original/grub"
                     cp "$grub_file" "$staging_dir/modified/grub"
                     case "$distro" in
-                        ubuntu|debian)
+                        ubuntu)
+                            sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub"
+                            ;;
+                        debian)
                             sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' "$staging_dir/modified/grub"
                             ;;
                         suse|sles|opensuse*)
@@ -911,7 +914,11 @@ check_nvme_timeout() {
             else
                 echo "[INFO] Setting nvme_core.io_timeout to 240..."
                 case "$distro" in
-                    ubuntu|debian)
+                    ubuntu)
+                        sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="nvme_core.io_timeout=240 /g' /etc/default/grub
+                        GRUB_DISABLE_OS_PROBER=true update-grub
+                        ;;
+                    debian)
                         sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="nvme_core.io_timeout=240 /g' /etc/default/grub
                         GRUB_DISABLE_OS_PROBER=true update-grub
                         ;;
