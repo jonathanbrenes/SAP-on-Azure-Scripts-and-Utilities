@@ -36,7 +36,7 @@
 
 **Conversion test results (2026-03-24, Standard_D2ads_v7 — AMD Dadsv7):** 44 of 45 VMs converted from SCSI (`Standard_B2s`) to NVMe (`Standard_D2ads_v7`). **Same failure: `sles-12-sp5-gen2-x64-gen2-latest`** — identical kernel panic as on Ddsv6. The bug is in `suse_msi_set_irq_unmanaged` (SUSE-patched MSI-X code in kernel 4.12.14-16.200-azure): the temp/resource disk NVMe controller fails `can't allocate MSI-X affinity masks for 1 vectors` → NULL dereference. Confirmed hardware-independent — fails on both Intel (Ddsv6) and AMD (Dadsv7). SLES 12 SP5 is EOL (Oct 2024); **this OS cannot run on NVMe-only VM sizes**. It works fine on dual-controller sizes like `Standard_E2bds_v5` where the temp disk stays on SCSI.
 
-**Pending: SLES 12 SP5 troubleshooting on v6/v7.** Further investigation needed to determine if a kernel update or workaround exists for the MSI-X affinity mask allocation failure on NVMe-only VM sizes.
+**SLES 12 SP5 is incompatible with v6/v7 hardware entirely.** Investigation complete: (1) On v6/v7 sizes **with** a temp disk (e.g. `Standard_D2ds_v6`, `Standard_D2ads_v7`), the temp disk NVMe controller triggers the MSI-X kernel panic described above. (2) On v6/v7 sizes **without** a temp disk (e.g. `Standard_D2s_v6`), NVMe boots successfully with a single OS disk controller — but the MANA network driver in kernel 4.12.14 cannot handle v6/v7 NIC firmware, logging `TX: unknown CQE type 42` and resulting in **no network connectivity**. No kernel update is available (SLES 12 SP5 EOL Oct 2024, latest kernel is 4.12.14-16.200.1). SLES 12 SP5 only works on v5 and older VM families.
 
 ---
 
