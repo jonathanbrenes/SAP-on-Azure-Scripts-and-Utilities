@@ -50,17 +50,7 @@ The playbook writes:
 - `nvme-dryrun-report.json` — local JSON report in the playbook directory
 - `/var/www/html/index.html` — interactive HTML dashboard with per-host detail panels
 
-### Option B: Standalone Script (single host)
-
-```bash
-# Check only — reports NVMe readiness, no changes
-./nvme-check-dryrun.sh
-
-# Dry-run — stages all proposed changes in /tmp/nvme-conversion-dryrun
-sudo ./nvme-check-dryrun.sh -fix -dry
-```
-
-### Option C: ARM Template Lab Builder
+### Option B: ARM Template Lab Builder
 
 Open `scsi2nvme-tester.html` in a browser to generate an ARM template that deploys a full test lab (control VM + image VMs) with automated playbook execution.
 
@@ -88,12 +78,7 @@ jq '[.results | group_by(.distro)[] | {distro: .[0].distro, count: length}]' nvm
 
 For hosts that reported `needs_changes`, apply the actual fixes (rebuild initramfs, update grub with `nvme_core.io_timeout=240`).
 
-```bash
-# Fix mode — applies changes on a single host
-sudo ./nvme-check-dryrun.sh -fix
-```
-
-Or use the PowerShell script with `-FixOperatingSystemSettings`:
+Use the PowerShell script with `-FixOperatingSystemSettings`:
 
 ```powershell
 .\Azure-NVMe-Conversion.ps1 -ResourceGroupName "myRG" -VMName "sapvm01" `
@@ -213,7 +198,6 @@ $jobs | Remove-Job
 | File | Purpose |
 |---|---|
 | `nvme-dryrun-playbook.yml` | Self-contained Ansible playbook — runs dry-run assessment and produces JSON + HTML reports |
-| `nvme-check-dryrun.sh` | Standalone bash script — supports check, fix, and dry-run modes via `-fix` and `-dry` flags |
 | `nvme-postconversion-check.yml` | Ansible playbook — post-conversion verification (IMDS + lsblk) |
 | `scsi2nvme-tester.html` | Browser-based ARM template builder for deploying a test lab in Azure |
 

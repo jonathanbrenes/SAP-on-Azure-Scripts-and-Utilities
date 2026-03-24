@@ -1163,6 +1163,7 @@ a{color:#0078d4;font-weight:700}</style></head>
 <body><div class="wrap"><h1>SCSI-to-NVMe Test Results</h1>
 <p id="status">Loading results.json...</p>
 <a id="dl" style="display:none" download="results.json">Download results.json</a>
+<a href="postconv.html" style="margin-left:12px">Postconversion Checks</a>
 <pre id="out"></pre>
 <script>
 (async function(){
@@ -1213,6 +1214,19 @@ __SCRIPT_END__</div></body></html>`
     `echo '${postconvB64}' | base64 -d | gunzip > /home/ansible/postconversion-check.yml`,
     'chown ansible /home/ansible/postconversion-check.yml',
     `cat <<'HTML_EOF' > /var/www/html/index.html\n${indexHtml}\nHTML_EOF`,
+    `cat <<'POSTCONV_HOLDER' > /var/www/html/postconv.html
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Postconversion Checks</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:#201f1e}
+.c{text-align:center;background:#fff;padding:40px 48px;border-radius:12px;border:1px solid #edebe9;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+h1{color:#0078d4;margin:0 0 12px;font-size:22px}p{color:#605e5c;margin:4px 0;font-size:14px}
+code{background:#f0f0f0;padding:4px 8px;border-radius:4px;font-size:13px}
+a{color:#0078d4;font-weight:700}</style></head>
+<body><div class="c"><h1>Postconversion checks have not been run</h1>
+<p>Run the following on the control VM:</p>
+<p><code>ansible-playbook /home/ansible/postconversion-check.yml</code></p>
+<p style="margin-top:16px"><a href="postconv.html">Refresh this page</a> &middot; <a href="/">Back to dry-run results</a></p>
+</div></body></html>
+POSTCONV_HOLDER`,
     `cat <<'WAITER_EOF' > /home/ansible/run-test.sh\n#!/bin/bash\nVM_COUNT=$(ansible --list-hosts VMs 2>/dev/null | tail -n +2 | grep -c '[^[:space:]]')\nMAX_WAIT=1800\nELAPSED=0\nsudo tee /var/www/html/index.html > /dev/null <<'HOLDER'\n<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SCSI-to-NVMe - Waiting</title>\n<style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:#201f1e}\n.c{text-align:center;background:#fff;padding:40px 48px;border-radius:12px;border:1px solid #edebe9;box-shadow:0 2px 8px rgba(0,0,0,.08)}\nh1{color:#0078d4;margin:0 0 8px;font-size:22px}p{color:#605e5c;margin:4px 0;font-size:14px}\n.spin{display:inline-block;width:28px;height:28px;border:3px solid #edebe9;border-top-color:#0078d4;border-radius:50%;animation:s .8s linear infinite;margin-bottom:12px}@keyframes s{to{transform:rotate(360deg)}}</style></head>\n<body><div class="c"><div class="spin"></div><h1>Playbook has not run yet</h1><p>Waiting for all VMs to respond to ping&hellip;</p><p id="st">0 / __VM_COUNT__ VMs online &mdash; elapsed 0s</p><p style="font-size:12px;color:#a0a0a0;margin-top:16px;">This page auto-refreshes every 30 seconds.</p></div></body></html>\nHOLDER\nsudo sed -i "s|__VM_COUNT__|$VM_COUNT|g" /var/www/html/index.html\nwhile [ $ELAPSED -lt $MAX_WAIT ]; do\n  OK=$(ansible -m ping VMs -f 30 -o 2>/dev/null | grep -c SUCCESS)\n  ELAPSED=$((ELAPSED + 15))\n  sudo sed -i "s|<p id=\\"st\\">[^<]*</p>|<p id=\\"st\\">$OK / $VM_COUNT VMs online \\&mdash; elapsed ${'${'}ELAPSED}s</p>|" /var/www/html/index.html 2>/dev/null\n  if [ "$OK" -ge "$VM_COUNT" ] && [ "$VM_COUNT" -gt 0 ]; then\n    sudo sed -i "s|<h1>[^<]*</h1>|<h1>Test playbook running\\&hellip;</h1>|;s|<p>Waiting[^<]*</p>|<p>All $VM_COUNT VMs online. Executing ansible-playbook test.yml</p>|;s|<p id=\\"st\\">[^<]*</p>|<p id=\\"st\\">Started at $(date -u +%H:%M:%S) UTC</p>|" /var/www/html/index.html 2>/dev/null\n    ansible-playbook -f 30 /home/ansible/test.yml 2>&1 | tee /home/ansible/test-run.log\n    exit 0\n  fi\n  sleep 15\ndone\necho "Timed out waiting for all VMs after ${'${'}MAX_WAIT}s" > /home/ansible/test-run.log\nWAITER_EOF`,
     'chown ansible:ansible /home/ansible/run-test.sh',
     'chmod +x /home/ansible/run-test.sh',
@@ -1592,7 +1606,7 @@ const DEFAULT_TEST_YAML = String.raw`---
     # ── 1. Deploy and run the NVMe dry-run check script ──────────────────
     - name: Copy NVMe dry-run check script to target
       ansible.builtin.copy:
-        dest: /tmp/nvme-check-dryrun.sh
+        dest: /tmp/nvme-preflight-check.sh
         mode: "0755"
         content: |
           #!/bin/bash
@@ -1795,7 +1809,7 @@ const DEFAULT_TEST_YAML = String.raw`---
           exit 0
 
     - name: Execute dry-run check script
-      ansible.builtin.command: /tmp/nvme-check-dryrun.sh
+      ansible.builtin.command: /tmp/nvme-preflight-check.sh
       register: dryrun_output
       changed_when: false
       failed_when: false
@@ -1862,7 +1876,7 @@ const DEFAULT_TEST_YAML = String.raw`---
     # ── 5. Cleanup remote artifacts ─────────────────────────────────────────
     - name: Remove dry-run script from target
       ansible.builtin.file:
-        path: /tmp/nvme-check-dryrun.sh
+        path: /tmp/nvme-preflight-check.sh
         state: absent
 
     - name: Remove staging directory from target
@@ -1973,6 +1987,7 @@ const DEFAULT_TEST_YAML = String.raw`---
             <h1>SCSI-to-NVMe Conversion Assessment</h1>
             <span class="sp"></span>
             <a class="gb" href="results.json" download><svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-5 1h10v1H3v-1z"/></svg> JSON</a>
+            <a class="gb" href="postconv.html"><svg viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM7.25 5h1.5v1.5h-1.5V5zm0 3h1.5v4h-1.5V8z"/></svg> Postconversion Checks</a>
           </div>
 
           {# ── Macros ── #}
@@ -2066,7 +2081,7 @@ const DEFAULT_POSTCONVERSION_YAML = String.raw`---
 # Post-NVMe Conversion Verification Playbook
 # Collects IMDS VM SKU metadata and lsblk output from all hosts
 # to verify NVMe conversion was successful.
-# Output: /var/www/html/results.json + /var/www/html/index.html
+# Output: /var/www/html/postconv-results.json + /var/www/html/postconv.html
 # =============================================================================
 
 - name: Post-NVMe Conversion Verification
@@ -2156,14 +2171,14 @@ const DEFAULT_POSTCONVERSION_YAML = String.raw`---
         path: /var/www/html
         state: directory
 
-    - name: Write /var/www/html/results.json
+    - name: Write /var/www/html/postconv-results.json
       copy:
-        dest: /var/www/html/results.json
+        dest: /var/www/html/postconv-results.json
         content: "{{ combined_report | to_nice_json }}"
 
     - name: Generate post-conversion HTML report
       copy:
-        dest: /var/www/html/index.html
+        dest: /var/www/html/postconv.html
         content: |
           <!DOCTYPE html>
           <html lang="en">
@@ -2212,7 +2227,8 @@ const DEFAULT_POSTCONVERSION_YAML = String.raw`---
           <div class="hd">
             <h1>Post-NVMe Conversion Verification</h1>
             <span class="sp"></span>
-            <a class="gb" href="results.json" download><svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-5 1h10v1H3v-1z"/></svg> JSON</a>
+            <a class="gb" href="postconv-results.json" download><svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-5 1h10v1H3v-1z"/></svg> JSON</a>
+            <a class="gb" href="/" title="Back to dry-run results"><svg viewBox="0 0 16 16"><path d="M8 1L1 7h2v6h4V9h2v4h4V7h2L8 1z"/></svg> Dry-run</a>
           </div>
 
           {# ── Summary ── #}
@@ -2275,7 +2291,7 @@ const DEFAULT_POSTCONVERSION_YAML = String.raw`---
       debug:
         msg: >-
           Post-conversion report: {{ combined_report.summary.nvme_ok }}/{{ combined_report.summary.total }} VMs on NVMe.
-          {{ combined_report.summary.nvme_missing }} missing. Results at /var/www/html/
+          {{ combined_report.summary.nvme_missing }} missing. Results at /var/www/html/postconv.html
 `.replace('__SCRIPT_END__', '<' + '/script>');
 const POSTCONVERSION_YAML = DEFAULT_POSTCONVERSION_YAML;
 
